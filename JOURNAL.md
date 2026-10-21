@@ -470,7 +470,11 @@ caelum/gtk_ui/    window.py  settings.py  clouds.py  autostart.py  app.py
 - App runs from the extracted .deb, via the shim, and via a `pipx install --system-site-packages .` with no tracebacks.
 - Machine is now on **Ubuntu 26.04.1 LTS** with Python 3.14.
 
+### Release
+- Published **v1.0.0** on GitHub Releases with `caelum_1.0.0_all.deb` attached
+  (https://github.com/Juliowilly/caelum/releases/tag/v1.0.0). The tag points at this journal commit; code is identical to `3591643`.
+
 ### Next session
-- Install the .deb locally and test (`sudo apt install ./dist/caelum_1.0.0_all.deb`). Optionally publish as a GitHub Release.
+- Install the .deb locally and test (`sudo apt install ./dist/caelum_1.0.0_all.deb`).
 - Start the Kivy front-end (`caelum/kivy_ui/`) on top of `caelum/core`: projection + sky gradient + sun/moon first,
   then clouds via a soft-puff texture.
