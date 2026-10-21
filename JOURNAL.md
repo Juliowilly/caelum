@@ -364,3 +364,18 @@ Or via tmux alias: `work-sky` (attaches to existing session or creates new one i
 ### Comment fix
 
 10. **Wrong comment in `_render_frame_to_surface`** — Said "White background" but the code paints black. Fixed to "Black background".
+
+---
+
+## Session 7 — Second code review pass (3 fixes)
+
+**Goal:** Second comprehensive review pass — found and fixed 3 more issues.
+
+### Bug
+1. **Weather timer was 60 seconds instead of 30 minutes** — `GLib.timeout_add(60 * 1000, ...)` made HTTP requests to Open-Meteo and MET Norway once per minute. MET Norway data updates hourly; Open-Meteo every 15 min. README and Settings hint both said "every 30 min". Fixed to `30 * 60 * 1000`.
+
+### Dead code
+2. **`if utc is not None:` guard in `_draw_stars` was always True** — `utc` is assigned unconditionally at the top of the function when `None`. The twinkling alpha calculation was always running. Removed the dead conditional and de-indented the three lines.
+
+### i18n
+3. **`'click to set facing'` compass label not translated** — Hardcoded English string in `_draw_compass`. Added to all 5 language dicts and wrapped with `_t()`.

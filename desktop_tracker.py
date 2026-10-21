@@ -175,6 +175,7 @@ _TRANSLATIONS = {
         'Longitude (+E / -W)': 'Longitude (+E / -O)',
         'Timezone': 'Fuseau horaire',
         'Save & Apply': 'Enregistrer',
+        'click to set facing': 'cliquer pour orienter',
         'Facing North': 'Face au Nord',           'Facing North-East': 'Face au Nord-Est',
         'Facing East': "Face à l'Est",            'Facing South-East': 'Face au Sud-Est',
         'Facing South (default)': 'Face au Sud (défaut)',
@@ -236,6 +237,7 @@ _TRANSLATIONS = {
         'Longitude (+E / -W)': 'Longitud (+E / -O)',
         'Timezone': 'Zona horaria',
         'Save & Apply': 'Guardar',
+        'click to set facing': 'clic para orientar',
         'Facing North': 'Mirando al Norte',       'Facing North-East': 'Mirando al Noreste',
         'Facing East': 'Mirando al Este',         'Facing South-East': 'Mirando al Sureste',
         'Facing South (default)': 'Mirando al Sur (default)',
@@ -297,6 +299,7 @@ _TRANSLATIONS = {
         'Longitude (+E / -W)': 'Längengrad (+O / -W)',
         'Timezone': 'Zeitzone',
         'Save & Apply': 'Speichern',
+        'click to set facing': 'Klicken zum Ausrichten',
         'Facing North': 'Richtung Nord',          'Facing North-East': 'Richtung Nordost',
         'Facing East': 'Richtung Ost',            'Facing South-East': 'Richtung Südost',
         'Facing South (default)': 'Richtung Süd (Standard)',
@@ -358,6 +361,7 @@ _TRANSLATIONS = {
         'Longitude (+E / -W)': 'Longitude (+E / -O)',
         'Timezone': 'Fuso horário',
         'Save & Apply': 'Guardar',
+        'click to set facing': 'clicar para orientar',
         'Facing North': 'Virado a Norte',         'Facing North-East': 'Virado a Nordeste',
         'Facing East': 'Virado a Este',           'Facing South-East': 'Virado a Sudeste',
         'Facing South (default)': 'Virado a Sul (padrão)',
@@ -419,6 +423,7 @@ _TRANSLATIONS = {
         'Longitude (+E / -W)': 'Longitudine (+E / -O)',
         'Timezone': 'Fuso orario',
         'Save & Apply': 'Salva',
+        'click to set facing': 'clic per orientare',
         'Facing North': 'Rivolto a Nord',         'Facing North-East': 'Rivolto a Nord-Est',
         'Facing East': 'Rivolto a Est',           'Facing South-East': 'Rivolto a Sud-Est',
         'Facing South (default)': 'Rivolto a Sud (predefinito)',
@@ -1569,7 +1574,7 @@ class SkyTracker(Gtk.Window):
         self._fetch_weather_async()
         self._fetch_city_name()
         GLib.timeout_add(100,             self._tick)
-        GLib.timeout_add(60 * 1000,       self._fetch_weather_async)
+        GLib.timeout_add(30 * 60 * 1000,  self._fetch_weather_async)
         GLib.timeout_add(5 * 60 * 1000,  self._export_lockscreen_bg)
         if self._has_compass:
             GLib.timeout_add(500, self._poll_compass)
@@ -2279,10 +2284,9 @@ class SkyTracker(Gtk.Window):
 
             elev_fade = _clamp((alt + 1.0) / 12.0, 0.0, 1.0)
             alpha     = intensity * elev_fade * moon_fade * _clamp((6.0 - mag) / 6.5, 0.05, 1.0)
-            if utc is not None:
-                t_sec     = utc.hour * 3600 + utc.minute * 60 + utc.second
-                phase_off = (ra_h * 7919.0 + abs(dec_deg) * 3571.0) % (2 * math.pi)
-                alpha     = _clamp(alpha * (1.0 + 0.14 * math.sin(t_sec * 2.7 + phase_off)), 0.0, 1.0)
+            t_sec     = utc.hour * 3600 + utc.minute * 60 + utc.second
+            phase_off = (ra_h * 7919.0 + abs(dec_deg) * 3571.0) % (2 * math.pi)
+            alpha     = _clamp(alpha * (1.0 + 0.14 * math.sin(t_sec * 2.7 + phase_off)), 0.0, 1.0)
             radius    = max(0.4, (5.5 - mag) * 0.38)
 
             cr.set_source_rgba(sr, sg, sb, alpha)
@@ -2742,7 +2746,7 @@ class SkyTracker(Gtk.Window):
             cr.select_font_face('Sans', cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
             cr.set_font_size(9)
             cr.set_source_rgba(0.70, 0.88, 1.0, 0.80)
-            lbl = 'click to set facing'
+            lbl = _t('click to set facing')
             ext = cr.text_extents(lbl)
             cr.move_to(cx - ext.width / 2, cy + r + 14)
             cr.show_text(lbl)
