@@ -672,3 +672,8 @@ caelum/gtk_ui/    window.py  settings.py  clouds.py  autostart.py  app.py
   subtitle baseline (`y+h-6` = y+38) sat on the value baseline (y+37), hiding "Lo"; temperature/wind ran
   past the right edge. Own layout now: 210×50 at `W-224` (aligned with the forecast column, which starts
   at y=74), temp/wind beside the percentage, Lo/Mid/Hi on its own row, icon 26 px on the right.
+- **Snap Store featured banner** `data/store/banner.png`: 1920×640 (the store requires exactly 3:1;
+  min 720×240, max 4320×1440, 1920×640 recommended, PNG/JPEG ≤ 2 MB). Built from the sunset scene in
+  clean mode (no cards/compass/labels, facing 230°), cropped to the y=240–880 band, with icon,
+  "Caelum" (Ubuntu Sans Light) and the tagline "The real sky, live on your desktop" right-aligned,
+  110 px from the edges.
