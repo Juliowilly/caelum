@@ -1545,7 +1545,11 @@ class SkyTracker(Gtk.Window):
         self._last_date    = None
         self._settings_win = None
         self._clouds           = dict(_NO_CLOUDS)
-        self._last_weather_ts  = ''   # Open-Meteo 'current.time'; changes every 15 min
+        self._last_weather_ts  = ''   # last merged ts; changes when either source updates
+        self._last_om          = None # last Open-Meteo raw result
+        self._last_met         = None # last MET Norway raw result
+        self._om_fetching      = False
+        self._met_fetching     = False
         self._hover_const  = None
         self._star_screen_cache = {}
         self._mouse_x = self._mouse_y = -1
@@ -1558,7 +1562,6 @@ class SkyTracker(Gtk.Window):
         self._today_str          = datetime.date.today().isoformat()
         self._astro_cache        = None   # (sun_el, sun_az, m_el, m_az, phase, age, m_bright)
         self._astro_cache_t      = 0.0    # time.monotonic() of last astro recalc
-        self._weather_fetching   = False  # dedup flag for _fetch_weather_async
         self._cmp_cx  = 62
         self._cmp_cy  = 95
         self._cmp_r   = 46
@@ -1573,8 +1576,9 @@ class SkyTracker(Gtk.Window):
         self._refresh_day()
         self._fetch_weather_async()
         self._fetch_city_name()
-        GLib.timeout_add(100,             self._tick)
-        GLib.timeout_add(30 * 60 * 1000,  self._fetch_weather_async)
+        GLib.timeout_add(100,              self._tick)
+        GLib.timeout_add(15 * 60 * 1000,  self._fetch_om_async)
+        GLib.timeout_add(60 * 60 * 1000,  self._fetch_met_async)
         GLib.timeout_add(5 * 60 * 1000,  self._export_lockscreen_bg)
         if self._has_compass:
             GLib.timeout_add(500, self._poll_compass)
@@ -1757,30 +1761,51 @@ class SkyTracker(Gtk.Window):
     # ── Weather ──────────────────────────────────────────────────────────────
 
     def _fetch_weather_async(self):
-        if self._weather_fetching:
+        """Fetch both sources at once — used at startup and after location change."""
+        self._fetch_om_async()
+        self._fetch_met_async()
+        return True
+
+    def _fetch_om_async(self):
+        """Fetch Open-Meteo (current conditions); called every 15 min."""
+        if self._om_fetching:
             return True
-        self._weather_fetching = True
+        self._om_fetching = True
         lat, lon = self.cfg['latitude'], self.cfg['longitude']
-        need_city = (self._city_name is None)
         def _work():
-            buf = [None, None]
-            def _om():  buf[0] = fetch_open_meteo(lat, lon)
-            def _met(): buf[1] = fetch_met_norway(lat, lon)
-            t1 = threading.Thread(target=_om,  daemon=True)
-            t2 = threading.Thread(target=_met, daemon=True)
-            t1.start(); t2.start()
-            t1.join(timeout=12); t2.join(timeout=12)
-            merged = merge_weather(buf[0], buf[1])
-            if merged is not None:
-                GLib.idle_add(self._apply_clouds, merged)
-            GLib.idle_add(self._clear_weather_fetching)
-            if need_city:
-                GLib.idle_add(self._fetch_city_name)
+            result = fetch_open_meteo(lat, lon)
+            GLib.idle_add(self._apply_om, result)
         threading.Thread(target=_work, daemon=True).start()
         return True
 
-    def _clear_weather_fetching(self):
-        self._weather_fetching = False
+    def _apply_om(self, result):
+        self._om_fetching = False
+        if result is not None:
+            self._last_om = result
+            merged = merge_weather(self._last_om, self._last_met)
+            if merged is not None:
+                self._apply_clouds(merged)
+        return False
+
+    def _fetch_met_async(self):
+        """Fetch MET Norway (forecast + hourly); called every hour."""
+        if self._met_fetching:
+            return True
+        self._met_fetching = True
+        lat, lon = self.cfg['latitude'], self.cfg['longitude']
+        def _work():
+            result = fetch_met_norway(lat, lon)
+            GLib.idle_add(self._apply_met, result)
+        threading.Thread(target=_work, daemon=True).start()
+        return True
+
+    def _apply_met(self, result):
+        self._met_fetching = False
+        if result is not None:
+            self._last_met = result
+            merged = merge_weather(self._last_om, self._last_met)
+            if merged is not None:
+                self._apply_clouds(merged)
         return False
 
     def _fetch_city_name(self):
@@ -4072,6 +4097,8 @@ class SettingsDialog(Gtk.Window):
             self.par._refresh_day()
             self.par._selected_day       = None
             self.par._selected_day_slots = []
+            self.par._last_om  = None
+            self.par._last_met = None
             self.par._fetch_weather_async()
             self.par._city_name = None
             self.par._fetch_city_name()
