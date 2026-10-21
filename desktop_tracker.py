@@ -779,7 +779,7 @@ def save_config(cfg):
 
 # ─── Autostart ───────────────────────────────────────────────────────────────
 
-_AUTOSTART_PATH = os.path.expanduser('~/.config/autostart/sky-tracker.desktop')
+_AUTOSTART_PATH = os.path.expanduser('~/.config/autostart/caelum.desktop')
 _SCRIPT_PATH    = os.path.abspath(__file__)
 
 def set_autostart(enabled):
@@ -787,7 +787,7 @@ def set_autostart(enabled):
         os.makedirs(os.path.dirname(_AUTOSTART_PATH), exist_ok=True)
         with open(_AUTOSTART_PATH, 'w') as f:
             f.write(
-                '[Desktop Entry]\nType=Application\nName=Sky Tracker\n'
+                '[Desktop Entry]\nType=Application\nName=Caelum\n'
                 f'Exec=python3 {_SCRIPT_PATH}\nHidden=false\n'
                 'NoDisplay=false\nX-GNOME-Autostart-enabled=true\n'
             )
@@ -1115,7 +1115,7 @@ def fetch_met_norway(lat, lon):
     url = (f"https://api.met.no/weatherapi/locationforecast/2.0/compact"
            f"?lat={lat:.4f}&lon={lon:.4f}")
     req = urllib.request.Request(url, headers={
-        'User-Agent': 'sky-tracker/1.0 https://github.com/user/sky-tracker'
+        'User-Agent': 'caelum/1.0 https://github.com/Juliowilly/caelum'
     })
     try:
         with urllib.request.urlopen(req, timeout=10) as r:
@@ -1757,7 +1757,7 @@ class SkyTracker(Gtk.Window):
                 url = (f"https://nominatim.openstreetmap.org/reverse"
                        f"?format=json&lat={lat:.4f}&lon={lon:.4f}&zoom=10")
                 req = urllib.request.Request(url, headers={
-                    'User-Agent': 'sky-tracker/1.0 github.com/user/sky-tracker'
+                    'User-Agent': 'caelum/1.0 github.com/Juliowilly/caelum'
                 })
                 with urllib.request.urlopen(req, timeout=8) as r:
                     data = json.loads(r.read())
@@ -2418,7 +2418,7 @@ class SkyTracker(Gtk.Window):
         if surf is None:
             return True
         out_dir  = os.path.expanduser('~/.cache')
-        out_path = os.path.join(out_dir, 'sky-tracker-lockscreen.png')
+        out_path = os.path.join(out_dir, 'caelum-lockscreen.png')
         def _work(surface, path, export_mode):
             try:
                 os.makedirs(out_dir, exist_ok=True)
@@ -3669,7 +3669,7 @@ _FACING_OPTIONS = [
 class SettingsDialog(Gtk.Window):
 
     def __init__(self, parent):
-        super().__init__(title='Sky Tracker — Settings')
+        super().__init__(title='Caelum — Settings')
         self.par = parent
         self.cfg = parent.cfg
         self.set_default_size(330, 540)

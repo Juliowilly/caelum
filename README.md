@@ -1,6 +1,6 @@
-# Background Sky
+# Caelum
 
-A native desktop widget that turns your screen background into a live, realistic sky — showing the real position of the sun, moon, planets, and stars for your location, with real-time weather and astronomical data.
+A native desktop widget that turns your screen background into a live, photorealistic sky — showing the real position of the sun, moon, planets, and stars for your location, with real-time weather and astronomical data.
 
 ![Platform](https://img.shields.io/badge/platform-Linux-blue)
 ![Python](https://img.shields.io/badge/python-3.8%2B-blue)
