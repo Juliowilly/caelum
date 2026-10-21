@@ -26,7 +26,7 @@ platforms:
 
 apps:
   caelum:
-    command: usr/bin/python3 -m caelum
+    command: bin/caelum
     desktop: usr/share/applications/io.github.juliowilly.Caelum.desktop
     common-id: io.github.juliowilly.Caelum
     # snapd starts this when ~/snap/caelum/current/.config/autostart/caelum.desktop exists
@@ -42,14 +42,17 @@ parts:
   caelum:
     plugin: nil
     source: .
-    # Interpreter and bindings from Ubuntu 24.04; GTK itself comes from the gnome extension
+    # Python 3.12 itself comes from the core24 base (snapcraft drops it from stage-packages);
+    # the GI bindings come from Ubuntu 24.04 and GTK from the gnome extension
     stage-packages:
-      - python3
       - python3-gi
       - python3-gi-cairo
     override-build: |
       craftctl default
       SITE="$CRAFT_PART_INSTALL/usr/lib/python3/dist-packages"
+      install -d "$CRAFT_PART_INSTALL/bin"
+      printf '#!/bin/sh\nexec /usr/bin/python3 -m caelum "$@"\n' > "$CRAFT_PART_INSTALL/bin/caelum"
+      chmod 755 "$CRAFT_PART_INSTALL/bin/caelum"
       find caelum -name '*.py' -not -path 'caelum/kivy_ui/*' -exec install -D -m 644 {} "$SITE/{}" \;
       install -D -m 644 data/io.github.juliowilly.Caelum.svg \
         "$CRAFT_PART_INSTALL/usr/share/icons/hicolor/scalable/apps/io.github.juliowilly.Caelum.svg"

@@ -640,3 +640,16 @@ caelum/gtk_ui/    window.py  settings.py  clouds.py  autostart.py  app.py
   wchan points at this mount first.
 - The second run is stuck at "Trying to get project juliowilly-craft-remote-build", caught in the same
   Launchpad API slowness (4–10 s per request).
+- **remote-build abandoned**: it hung 3× at "Trying to get project … (attempt 1/6)" with its socket in
+  CLOSE-WAIT and the main thread on a lock (never retried). Back to local LXD.
+- **Real cause of the LXD "networking" timeouts** (not the firewall, whose lxdbr0 rules were correct):
+  LXD sometimes **fails to attach a new container's veth to lxdbr0** on first start (`ip link show
+  master lxdbr0` empty, the container's static IPv4 gets "No route to host"). `lxc restart` attaches it
+  (IPv4 at once). During builds a watcher restarts any snapcraft container with no IPv4 after 20 s.
+- **core24 ships Python 3.12**, so snapcraft silently drops `python3` from stage-packages and
+  `command: usr/bin/python3` failed the pack check ("usr/bin/python3 does not exist"). Now
+  `command: bin/caelum`, a launcher that `exec /usr/bin/python3 -m caelum`; only `python3-gi(-cairo)` are staged.
+- Changing override-build after a run gave "variable 'version' can be set only once": stale part
+  state, fixed with `snapcraft clean caelum` (keeps the downloaded GNOME SDK).
+- **Built `caelum_1.1.0_amd64.snap` (3.1 MB)**: launcher, cpython-312 `_gi`, desktop entry with the
+  `${SNAP}` icon, plugs network + gsettings (+ gnome extension set), no linter warnings, no kivy_ui.
