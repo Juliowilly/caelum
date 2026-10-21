@@ -605,3 +605,12 @@ caelum/gtk_ui/    window.py  settings.py  clouds.py  autostart.py  app.py
 - metainfo: screenshots, branding colours, display/controls, bugtracker/VCS URLs, 1.1.0 release notes;
   compass bullet reworded (hardware sensors aren't available in sandboxes).
 - Version **1.1.0** (`caelum/__init__.py`, `debian/changelog` 1.1.0-1, metainfo).
+
+### Step 5 — store accounts
+- Snap Store: logged in as `juliowilly`; **name `caelum` registered** (`snapcraft register`).
+- Local LXD builds still fail: new containers get no IPv4 (DHCP unanswered on lxdbr0 even after the
+  ufw rules), so the snap is built with `snapcraft remote-build` on Launchpad (also gives arm64).
+- GPG key for Launchpad: RSA 4096, fingerprint `0F8F7EF1922EFA195490DF4E747D0A3BC76874C6`;
+  its UID had a typo (`cjw.` instead of `jw.`), to be corrected before publishing to the keyserver.
+- Maintainer email changed to **jw.adamagaba@gmail.com** in `debian/{control,changelog,copyright}`
+  (user's choice, used everywhere from now on).

@@ -1,7 +1,7 @@
 Source: caelum
 Section: science
 Priority: optional
-Maintainer: Juliowilly <carlostoscani1@gmail.com>
+Maintainer: Juliowilly <jw.adamagaba@gmail.com>
 Build-Depends: debhelper-compat (= 13),
                dh-python,
                dh-sequence-python3,
