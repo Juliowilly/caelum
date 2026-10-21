@@ -24,6 +24,9 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.0.1" date="2026-10-21">
+      <description><p>App icon now shown on Caelum windows (dock, Alt+Tab), also when run from source.</p></description>
+    </release>
     <release version="1.0.0" date="2026-10-21"/>
   </releases>
 </component>

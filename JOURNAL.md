@@ -474,6 +474,16 @@ caelum/gtk_ui/    window.py  settings.py  clouds.py  autostart.py  app.py
 - Published **v1.0.0** on GitHub Releases with `caelum_1.0.0_all.deb` attached
   (https://github.com/Juliowilly/caelum/releases/tag/v1.0.0). The tag points at this journal commit; code is identical to `3591643`.
 
+### v1.0.1 — app icon on windows
+- The SVG icon existed in v1.0.0 but only the launcher used it: windows set no icon and no app id,
+  so the Settings window got a generic icon in the dock / Alt+Tab, and source runs had no icon at all.
+- `gtk_ui/app.py` `_set_app_identity()`: `GLib.set_prgname('io.github.juliowilly.Caelum')`
+  (= Wayland app_id / X11 WM_CLASS, which GNOME matches to the .desktop file), application name "Caelum",
+  default window icon from the icon theme when installed, else loaded from `data/` in the checkout.
+- README now shows the logo at the top; version bumped to 1.0.1 (`__init__.py`, metainfo release entry).
+- Published https://github.com/Juliowilly/caelum/releases/tag/v1.0.1 with `caelum_1.0.1_all.deb`.
+  v1.0.0 left unchanged.
+
 ### Next session
 - Install the .deb locally and test (`sudo apt install ./dist/caelum_1.0.0_all.deb`).
 - Start the Kivy front-end (`caelum/kivy_ui/`) on top of `caelum/core`: projection + sky gradient + sun/moon first,

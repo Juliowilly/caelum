@@ -1,4 +1,8 @@
-# Caelum
+<p align="center">
+  <img src="data/io.github.juliowilly.Caelum.svg" width="128" alt="Caelum icon">
+</p>
+
+<h1 align="center">Caelum</h1>
 
 A native desktop widget that turns your screen background into a live, photorealistic sky — showing the real position of the sun, moon, planets, and stars for your location, with real-time weather and astronomical data.
 
@@ -29,7 +33,7 @@ A native desktop widget that turns your screen background into a live, photoreal
 Download `caelum_<version>_all.deb` from the [Releases](https://github.com/Juliowilly/caelum/releases) page, or build it yourself (see below), then:
 
 ```bash
-sudo apt install ./caelum_1.0.0_all.deb
+sudo apt install ./caelum_1.0.1_all.deb
 caelum &
 ```
 

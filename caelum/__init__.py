@@ -1,3 +1,3 @@
 """Caelum — live sky overlay: sun, moon, planets, stars and weather for your location."""
 
-__version__ = '1.0.0'
+__version__ = '1.0.1'
