@@ -265,3 +265,62 @@ DISPLAY=:0 python3 desktop_tracker.py &
 ```
 
 Or via tmux alias: `work-sky` (attaches to existing session or creates new one in project dir).
+
+---
+
+## Session 5 — Weekly Forecast Accordion + Weather Icons + Info Card Icons + Bug Fixes + i18n + GitHub
+
+### Weekly forecast accordion (replaced hourly strip)
+- Removed `_draw_forecast_strip` (~113 lines of dead code) — bottom hourly strip was replaced by accordion
+- `_draw_weekly_forecast`: day cards stack vertically (right column); clicking a day expands hourly slots inline underneath it
+- Layout: `CARD_W=210`, `DAY_H=52`, `HOUR_H=28`; accordion uses cumulative `y` variable (not fixed grid)
+- `self._weekly_card_rects` — list of `(date_str, x, y, w, h)` hit-rects updated each frame for click detection
+- `self._selected_day` — ISO date string of the open day; `self._selected_day_slots` — hourly slots cached in `_on_click` (not filtered every frame)
+- Overflow boundary check: `max_days` computed from remaining screen height so accordion never goes off-screen
+
+### Cairo-drawn weather icons (`_draw_wx_icon`)
+- `_cloud()` uses `cr.push_group()` to prevent double-paint artifacts at circle overlaps
+- Symbol routing: `has_thunder`, `has_rain`, `has_snow`, `has_showers`, `has_heavy`, `has_light` flags
+- Snow asterisks (6-arm) for size ≥ 22px, dots for smaller
+- Icons shown on weekly day cards (32px), hourly rows (18px), and cloud cover badge
+
+### Astronomical info card icons + city name + moon aspect
+- `ic_clock`, `ic_pin`, `ic_sunrise`, `ic_solar_noon`, `ic_moon_phase`, `ic_moon_rise`, `ic_daylight` — all Cairo-drawn
+- `self._moon_limb_angle` stored each frame so `ic_moon_phase` draws crescent correctly oriented
+- `self._city_name` — fetched async from Nominatim on startup; shown in LOCATION card
+- `_fetch_city_name` retried after weather fetch if city is still None
+
+### "Lines on cards" bug fix
+- Root cause: `cr.show_text()` leaves a current point; `cr.save()`/`cr.restore()` does NOT save the Cairo path; `cr.arc()` with a live current point draws a connecting line before the arc (visible when stroked)
+- Fix: `cr.new_path()` before AND after every `icon_fn` call in `emit()`; also before `_draw_wx_icon` for the cloud badge
+
+### Comprehensive review — 14 fixes applied
+1. Removed dead `_draw_forecast_strip` method + `show_forecast` config key + Settings toggle
+2. **UTC fix**: `_on_draw` now computes `utc = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)` first, then `now = utc + timedelta(hours=tz_off)` — previously astronomical math used local time as UTC
+3. Removed `planet_positions()` cache-warm call in the `else` branch
+4. `_weather_fetching` dedup flag — prevents parallel weather fetches (GLib timer fires while previous fetch is still running)
+5. Astronomy cache (1s TTL): `solar_position`, `moon_position`, `moon_phase_age`, `moon_brightness` called at most once per second; stored in `self._astro_cache`
+6. Star positions already cached per-minute by `_get_star_positions` — no change needed
+7. `self._today_str` updated in `_refresh_day`, used in `_draw_weekly_forecast` instead of recomputing each frame
+8. `self._selected_day_slots` cached in `_on_click`; `_draw_weekly_forecast` reads it directly
+9. Removed `import datetime as _dt` from inside methods — fixed all `_dt.*` refs to use module-level `datetime`
+10. Weekly forecast overflow boundary check
+11. Lockscreen export thread safety: `_render_frame_to_surface()` now runs on main thread (GTK/Cairo requirement); only file I/O and `gsettings` subprocess calls go to background thread
+12. City name retry after weather fetch
+13. `_clear_weather_fetching` idle callback resets dedup flag
+14. `_draw_stars` fallback also fixed to use `datetime.timezone.utc` (was `utcnow()`)
+
+### i18n — 6 languages
+- `_LANG` global, `_t(key)` lookup function, `_set_lang(setting)` (accepts `'auto'` → reads system locale)
+- `_DAYS_SHORT`, `_MONTHS_SHORT` — per-language short day/month name tables
+- `_fmt_date(dt)` replaces `strftime('%a %d %b %Y')` — fully translated date string
+- `_TRANSLATIONS` dict: **en, fr, es, de, pt, it** — covers card titles, moon phases, weather conditions, all Settings labels
+- Parametric strings use format keys: `_t('pct_elapsed').format(pct=72)` → `'72% du jour écoulé'` in French
+- Language selector added to top of Settings dialog; change takes effect immediately without restart
+- `"language": "auto"` added to `DEFAULT_CONFIG`; persisted in `config.json`
+
+### Published to GitHub
+- App renamed **Caelum** (Latin for *sky*) throughout — settings window title, autostart .desktop, User-Agent strings, lockscreen export filename
+- `README.md` and `.gitignore` added
+- Repo: **https://github.com/Juliowilly/caelum** (public)
+- SSH key (`id_ed25519`) added to GitHub account via `gh auth login`
