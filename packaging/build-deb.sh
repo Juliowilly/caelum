@@ -17,7 +17,7 @@ mkdir -p "$PYDIR" "$STAGE/DEBIAN" "$STAGE/usr/bin" \
          "$STAGE/usr/share/icons/hicolor/scalable/apps" "$STAGE/usr/share/doc/caelum"
 
 # Python package — sources only, no bytecode (postinst compiles it)
-(cd "$ROOT" && find caelum -name '*.py' -print0 | xargs -0 -I{} install -D -m 644 {} "$PYDIR/{}")
+(cd "$ROOT" && find caelum -name '*.py' -not -path 'caelum/kivy_ui/*' -print0 | xargs -0 -I{} install -D -m 644 {} "$PYDIR/{}")
 
 cat > "$STAGE/usr/bin/caelum" <<'EOF'
 #!/usr/bin/python3

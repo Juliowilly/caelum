@@ -13,3 +13,6 @@ TASK_SPECIFICATION.md
 build/
 dist/
 *.egg-info/
+.venv-kivy/
+.buildozer/
+bin/

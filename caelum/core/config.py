@@ -13,6 +13,12 @@ CONFIG_PATH = os.path.join(_CONFIG_DIR, 'config.json')
 _LEGACY_CONFIG_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'config.json')
 
+def set_config_dir(path):
+    """Store config.json in `path` instead of the XDG dir (mobile apps have their own data dir)."""
+    global _CONFIG_DIR, CONFIG_PATH
+    _CONFIG_DIR = path
+    CONFIG_PATH = os.path.join(path, 'config.json')
+
 DEFAULT_CONFIG = {
     "latitude": 6.1375,
     "longitude": 1.2123,

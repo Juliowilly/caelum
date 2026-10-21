@@ -58,6 +58,23 @@ python3 -m caelum &          # or: python3 desktop_tracker.py
 
 Start automatically with GNOME via Settings → *Start with GNOME session*.
 
+## Mobile (Android, in progress)
+
+A Kivy front-end lives in `caelum/kivy_ui/`. It currently draws the sky gradient, twilight
+glows, stars and Milky Way, constellations, sun, moon phase, planets and the horizon. The view
+follows the phone's compass when held up to the sky, or you can drag to look around. Weather and
+clouds are not ported yet.
+
+Preview it on the desktop (Kivy needs Python ≤ 3.13):
+
+```bash
+uv venv -p 3.13 .venv-kivy && uv pip install -p .venv-kivy "kivy[base]==2.3.1" plyer
+.venv-kivy/bin/python -m caelum.kivy_ui                      # drag to look around
+.venv-kivy/bin/python -m caelum.kivy_ui --time 2026-10-21T22:00 --screenshot night.png
+```
+
+Build an APK with [Buildozer](https://buildozer.readthedocs.io): `buildozer android debug`, using `buildozer.spec`.
+
 ## Building packages
 
 ```bash
@@ -72,13 +89,16 @@ The version comes from `caelum/__init__.py`.
 
 ```
 caelum/
-  core/       platform-agnostic: astronomy, weather, config, i18n, star catalog, sky palettes
+  core/       platform-agnostic: astronomy, weather, config, i18n, star catalog, sky palettes, compass math
   gtk_ui/     Linux desktop front-end: GTK window, Cairo drawing, settings dialog, autostart
+  kivy_ui/    mobile front-end (Kivy): sky canvas, gradient textures, phone sensors
+main.py       Android entry point (required by Buildozer)
+tests/        python3 -m unittest discover -s tests
 data/         .desktop entry, icon, AppStream metainfo
 packaging/    build-deb.sh
 ```
 
-`caelum/core` must never import GTK or Cairo, so it can be reused by the planned Kivy mobile port.
+`caelum/core` must never import GTK, Cairo or Kivy; both front-ends build on it.
 
 ## Configuration
 

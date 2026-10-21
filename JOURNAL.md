@@ -488,3 +488,59 @@ caelum/gtk_ui/    window.py  settings.py  clouds.py  autostart.py  app.py
 - Install the .deb locally and test (`sudo apt install ./dist/caelum_1.0.0_all.deb`).
 - Start the Kivy front-end (`caelum/kivy_ui/`) on top of `caelum/core`: projection + sky gradient + sun/moon first,
   then clouds via a soft-puff texture.
+
+---
+
+## Session 11 — Kivy mobile port, milestone 1 (clear sky)
+
+**Goal:** Start the Kivy front-end on top of `caelum.core`, as decided in Session 10.
+
+### Dev environment
+- Kivy 2.3.1 has no wheels for Python 3.14 (the system Python). Installed `uv` (pipx) and made a
+  Python 3.13 venv: `.venv-kivy/` (gitignored). The APK build is unaffected: python-for-android builds
+  its own Python 3.11, and all of `caelum/` was compile-checked under 3.11.
+
+### New: `caelum/kivy_ui/`
+- `sky_view.py`: `SkyView` widget, a port of the GTK draw path. Sky gradient, Belt of Venus, pre-glow,
+  golden-hour band, haze, faint star field, airglow, Milky Way, catalog stars with twinkle, constellation
+  lines, M42, sun bloom, moon pre-glow, moon glow and phase disc, planets with Saturn's ring and labels,
+  horizon silhouette, and a HUD (time, date, moon phase, facing).
+  - Reuses `sky_to_screen()` etc. unchanged; `_k()` flips Cairo y-down to Kivy y-up.
+  - **Opaque sky**: the desktop sky is translucent over the wallpaper, but a phone app has nothing
+    behind it, so gradient alphas are dropped and the ground is always drawn opaque.
+  - Moon lit region = triangle strip between the limb and the terminator at equal heights, rotated
+    by the same `limb_angle` as the desktop. This handles crescent (concave) and gibbous alike.
+  - Redraw once a second; twinkle updates star `Color` alphas at 10 Hz without rebuilding.
+    Drag/compass changes go through `Clock.create_trigger`, so at most one redraw per frame.
+  - Measured on the T460s: night 7 ms / 1350 instructions, day 1 ms / 66 instructions.
+  - Desktop SCREEN blending for the sun is approximated with normal alpha blending.
+- `textures.py`: Cairo gradients baked into small cached textures (radial with inner radius,
+  vertical, alpha-only puff profile tinted with `Color`). LRU-capped at 256.
+- `sensors.py`: `Compass` (plyer accelerometer + magnetometer, no-op off-device) and
+  `request_location()` (Android runtime permission + one-shot plyer GPS fix, saved to config).
+- `app.py`: `CaelumApp`. On Android the config lives in `App.user_data_dir`. Preview flags:
+  `--time`, `--facing`, `--size`, `--screenshot`. Run with `python -m caelum.kivy_ui`.
+- HUD strings `compass` / `drag to look around` translated into all 5 languages.
+
+### New in core
+- `core/orientation.py`: `heading_from_sensors(accel, mag)`, built like Android's
+  `getRotationMatrix` (east = mag × up, north = up × east). Upright: heading of the back camera (-z),
+  so the screen shows the sky behind the phone. Flat: heading of the top edge.
+- `tests/test_orientation.py`: 4 tests (portrait at 6 azimuths, landscape, flat, degenerate readings).
+- `core/config.set_config_dir()` for platforms with their own data dir.
+
+### Packaging
+- `buildozer.spec` (landscape, fullscreen, location permissions, API 34 / min 24, arm64 + armv7;
+  version read from `caelum/__init__.py`) and root `main.py` (Buildozer entry point).
+- `data/io.github.juliowilly.Caelum-512.png` app icon, rendered from the SVG.
+- The .deb and the wheel now exclude `caelum/kivy_ui` (verified: 0 kivy_ui files in the .deb).
+
+### Verified
+- Desktop previews at 22:00, 18:05 and 13:00 UTC render correctly; GTK app still runs; tests and pyflakes pass.
+- **Not yet verified on a phone**: the APK has not been built; compass and GPS code is untested on hardware.
+
+### Next
+- Build the APK with Buildozer (needs Java 17 + several GB of Android SDK/NDK) and test on the Redmi Note 14 Pro.
+  Its magnetometer X axis is mirrored (Session 4), so the heading may need a per-device flip.
+- Milestone 2: weather fetch + clouds (soft-puff texture), rain/snow, meteors.
+- Portrait layout: the 240° panorama is squeezed on a narrow screen, so it needs a narrower FOV.
