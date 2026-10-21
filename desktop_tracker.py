@@ -2655,7 +2655,7 @@ class SkyTracker(Gtk.Window):
                 cr.stroke()
                 cr.restore()
             cr.select_font_face('Sans', cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
-            cr.set_font_size(9)
+            cr.set_font_size(9 * scale)
             cr.set_source_rgba(r, g, b, 0.72)
             cr.move_to(px + radius + 3, py + 4)
             cr.show_text(name)
@@ -2871,7 +2871,6 @@ class SkyTracker(Gtk.Window):
         t_seed    = int(time.time() * 8)
         rng       = random.Random(t_seed)
         if snow:
-            cr.set_line_width(0)
             for _ in range(n):
                 sx = rng.uniform(0, W)
                 sy = rng.uniform(0, H * 0.92)
@@ -4027,7 +4026,7 @@ class SettingsDialog(Gtk.Window):
 
         hint = Gtk.Label(xalign=0)
         hint.set_markup('<small>Right-click or click the gear to reopen this dialog.\n'
-                        'Weather refreshes every 30 min via Open-Meteo.</small>')
+                        'Open-Meteo every 15 min · MET Norway every 1 h.</small>')
         hint.set_margin_top(4)
         box.pack_start(hint, False, False, 0)
 

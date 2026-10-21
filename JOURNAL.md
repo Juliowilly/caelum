@@ -382,6 +382,24 @@ Or via tmux alias: `work-sky` (attaches to existing session or creates new one i
 
 ---
 
+## Session 9 — Third code review pass (3 fixes)
+
+**Goal:** Full review of all remaining sections (cloud drawing, planet drawing, compass, meteors, rain,
+sun/moon, weather icons, weekly forecast, HUD cards, SettingsDialog).
+
+### Fixes
+- **Stale hint text in SettingsDialog** (`desktop_tracker.py:4030`) — hint still said
+  "Weather refreshes every 30 min via Open-Meteo." Updated to reflect the actual dual-timer
+  schedule: "Open-Meteo every 15 min · MET Norway every 1 h."
+- **Dead `cr.set_line_width(0)` in snow path** (`_draw_rain`) — snow flakes are drawn with
+  `cr.arc()` + `cr.fill()`; `set_line_width` only affects `stroke()`, so the call had no
+  effect. Removed.
+- **Planet name label ignores `scale`** (`_draw_planets`) — all planet geometry (disc radius,
+  glow radius) already multiplied by `scale`; the name label was hardcoded to 9 px. Changed
+  to `9 * scale` so labels stay proportional at all asteroid-scale settings.
+
+---
+
 ## Session 8 — Independent weather timers per source
 
 **Goal:** User clarified the original 60 s timer was intentional; requested separate intervals per source.
