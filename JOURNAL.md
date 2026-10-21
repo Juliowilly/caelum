@@ -544,3 +544,23 @@ caelum/gtk_ui/    window.py  settings.py  clouds.py  autostart.py  app.py
   Its magnetometer X axis is mirrored (Session 4), so the heading may need a per-device flip.
 - Milestone 2: weather fetch + clouds (soft-puff texture), rain/snow, meteors.
 - Portrait layout: the 240° panorama is squeezed on a narrow screen, so it needs a narrower FOV.
+
+---
+
+## Session 12 — Finish the Linux desktop phase: Snap Store, Flathub, Launchpad PPA
+
+**Decision (user):** pause the APK and finish Linux distribution first. Targets: **Snap Store**,
+**Flathub**, **Launchpad PPA** (AppImage dropped: no real store, and Snap + Flatpak cover the distros).
+
+### Step 1 — sandbox-aware app (`caelum/gtk_ui/sandbox.py`)
+- `kind()` detects `flatpak` (`/.flatpak-info`) / `snap` (`$SNAP_NAME`) / plain install.
+- **Wallpaper export**: replaced the `gsettings` subprocess calls with in-process `Gio.Settings`
+  (schema/key looked up first, because GSettings aborts on unknown schemas). It runs on the main thread via
+  `GLib.idle_add` after the PNG is written in the worker thread. URI built with `GLib.filename_to_uri`
+  (the old `f'file://{path}'` broke on paths with spaces). Flatpak uses the Wallpaper portal
+  (`SetWallpaperFile`, fd passed, `set-on` = background/lockscreen/both), since dconf is out of reach there.
+  The snap writes the PNG to `$SNAP_USER_COMMON/.cache` so the path survives refreshes.
+- **Autostart**: snap keeps writing `~/.config/autostart/caelum.desktop` (HOME is the snap's, and snapd
+  launches it through snapcraft.yaml `autostart:`), with `Exec=caelum`. Flatpak uses the Background portal
+  (`RequestBackground`, `autostart`, `commandline=['caelum']`), with the choice remembered in a marker file.
+- Tested with `GSETTINGS_BACKEND=memory` (real wallpaper untouched); GTK app still runs.

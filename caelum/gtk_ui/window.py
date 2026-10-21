@@ -6,7 +6,6 @@ import json
 import math
 import os
 import random
-import subprocess
 import threading
 import time
 import urllib.request
@@ -35,6 +34,7 @@ from ..core.weather import (
 from .clouds import (
     _draw_overcast_sheet, _soft_puff, draw_altocumulus, draw_cirrus, draw_cumulus,
 )
+from . import sandbox
 from .settings import SettingsDialog
 
 # ─── Window ───────────────────────────────────────────────────────────────────
@@ -984,28 +984,24 @@ class SkyTracker(Gtk.Window):
         surf = self._render_frame_to_surface()
         if surf is None:
             return True
-        out_dir  = os.path.expanduser('~/.cache')
+        out_dir  = sandbox.cache_dir()
         out_path = os.path.join(out_dir, 'caelum-lockscreen.png')
         def _work(surface, path, export_mode):
             try:
                 os.makedirs(out_dir, exist_ok=True)
                 surface.write_to_png(path)
-                uri = f'file://{path}'
-                if export_mode in ('background', 'both'):
-                    subprocess.run(['gsettings', 'set',
-                                    'org.gnome.desktop.background',
-                                    'picture-uri', uri], check=False)
-                    subprocess.run(['gsettings', 'set',
-                                    'org.gnome.desktop.background',
-                                    'picture-uri-dark', uri], check=False)
-                if export_mode in ('lockscreen', 'both'):
-                    subprocess.run(['gsettings', 'set',
-                                    'org.gnome.desktop.screensaver',
-                                    'picture-uri', uri], check=False)
-            except Exception:
-                pass
+            except OSError:
+                return
+            GLib.idle_add(self._apply_wallpaper, path, export_mode)
         threading.Thread(target=_work, args=(surf, out_path, mode), daemon=True).start()
         return True   # keep timer alive
+
+    def _apply_wallpaper(self, path, mode):
+        try:
+            sandbox.set_wallpaper(path, mode)
+        except Exception:
+            pass   # no portal / no GNOME schemas: export stays a no-op
+        return False
 
     def _draw_gear_btn(self, cr, cx, cy, r, off=False):
         if off:
