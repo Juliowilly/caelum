@@ -324,3 +324,43 @@ Or via tmux alias: `work-sky` (attaches to existing session or creates new one i
 - `README.md` and `.gitignore` added
 - Repo: **https://github.com/Juliowilly/caelum** (public)
 - SSH key (`id_ed25519`) added to GitHub account via `gh auth login`
+
+---
+
+## Session 6 — Code review fixes (12 issues)
+
+**Goal:** Fix all 12 issues identified in a comprehensive code review at the end of Session 5.
+
+### Bugs fixed
+
+1. **`_apply_clouds` stale hourly slots** — When new weather data arrived every 30 min, the expanded forecast accordion kept showing the old hourly slots. `_apply_clouds` now re-derives `_selected_day_slots` from the fresh data when a day is expanded.
+
+2. **`_save` didn't clear selected day on location change** — After changing location and saving, the old hourly slots from the previous location persisted until the user manually closed the accordion. `_save` now resets `_selected_day` and `_selected_day_slots` before triggering the weather fetch.
+
+### Performance
+
+3. **`_WMO_PRECIP` dict moved to module-level** — Was being recreated inside `fetch_open_meteo` on every HTTP call. Now a module-level constant `_WMO_PRECIP`.
+
+4. **`sky_to_screen` double-call per star eliminated** — `_draw_stars` built `star_screen` (first pass) then called `sky_to_screen` again for the same stars in the drawing loop. Second pass now reads from `star_screen` directly, halving the projection math at night.
+
+5. **`_PHASE_NAMES` moved to module-level** — Was a local list recreated inside `_draw_cards` on every frame (once per second). Now `_PHASE_NAMES` constant at module level.
+
+### Dead code / cleanup
+
+6. **`_WX_DAYS` removed** — `['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']` was unused since i18n replaced it with `_day_name()`. Deleted.
+
+### i18n
+
+7. **`_FACING_OPTIONS` translated** — Direction labels like `'N  — Facing North'` were hardcoded English. `_FACING_OPTIONS` changed to 3-tuples `(az, abbrev, dir_key)`. Settings combo now builds labels as `f'{abbrev}  — {_t(dir_key)}'` at open time. Added 8 direction keys to all 5 non-English translation dicts (fr, es, de, pt, it).
+
+### Missing asset
+
+8. **`LICENSE` file created** — README claimed MIT but no LICENSE file existed. MIT license added to the repo.
+
+### .gitignore
+
+9. **`config.json` and `TASK_SPECIFICATION.md` added to `.gitignore`** — `config.json` contains personal coordinates and should not be committed. `TASK_SPECIFICATION.md` is an internal planning document. Also corrected the lockscreen filename from `sky-tracker-lockscreen.png` to `caelum-lockscreen.png`.
+
+### Comment fix
+
+10. **Wrong comment in `_render_frame_to_surface`** — Said "White background" but the code paints black. Fixed to "Black background".

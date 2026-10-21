@@ -93,7 +93,6 @@ _WX_ACCENT = {
     'thunderstorm': (0.90, 0.62, 1.00), 'rainandthunder': (0.85, 0.50, 1.00),
     'heavyrainandthunder': (0.80, 0.40, 1.00),
 }
-_WX_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 # ─── i18n ─────────────────────────────────────────────────────────────────────
 
@@ -176,6 +175,11 @@ _TRANSLATIONS = {
         'Longitude (+E / -W)': 'Longitude (+E / -O)',
         'Timezone': 'Fuseau horaire',
         'Save & Apply': 'Enregistrer',
+        'Facing North': 'Face au Nord',           'Facing North-East': 'Face au Nord-Est',
+        'Facing East': "Face à l'Est",            'Facing South-East': 'Face au Sud-Est',
+        'Facing South (default)': 'Face au Sud (défaut)',
+        'Facing South-West': 'Face au Sud-Ouest', 'Facing West': "Face à l'Ouest",
+        'Facing North-West': 'Face au Nord-Ouest',
     },
     'es': {
         'LOCAL TIME': 'HORA LOCAL',         'LOCATION': 'UBICACIÓN',
@@ -232,6 +236,11 @@ _TRANSLATIONS = {
         'Longitude (+E / -W)': 'Longitud (+E / -O)',
         'Timezone': 'Zona horaria',
         'Save & Apply': 'Guardar',
+        'Facing North': 'Mirando al Norte',       'Facing North-East': 'Mirando al Noreste',
+        'Facing East': 'Mirando al Este',         'Facing South-East': 'Mirando al Sureste',
+        'Facing South (default)': 'Mirando al Sur (default)',
+        'Facing South-West': 'Mirando al Suroeste','Facing West': 'Mirando al Oeste',
+        'Facing North-West': 'Mirando al Noroeste',
     },
     'de': {
         'LOCAL TIME': 'ORTSZEIT',           'LOCATION': 'STANDORT',
@@ -288,6 +297,11 @@ _TRANSLATIONS = {
         'Longitude (+E / -W)': 'Längengrad (+O / -W)',
         'Timezone': 'Zeitzone',
         'Save & Apply': 'Speichern',
+        'Facing North': 'Richtung Nord',          'Facing North-East': 'Richtung Nordost',
+        'Facing East': 'Richtung Ost',            'Facing South-East': 'Richtung Südost',
+        'Facing South (default)': 'Richtung Süd (Standard)',
+        'Facing South-West': 'Richtung Südwest',  'Facing West': 'Richtung West',
+        'Facing North-West': 'Richtung Nordwest',
     },
     'pt': {
         'LOCAL TIME': 'HORA LOCAL',         'LOCATION': 'LOCALIZAÇÃO',
@@ -344,6 +358,11 @@ _TRANSLATIONS = {
         'Longitude (+E / -W)': 'Longitude (+E / -O)',
         'Timezone': 'Fuso horário',
         'Save & Apply': 'Guardar',
+        'Facing North': 'Virado a Norte',         'Facing North-East': 'Virado a Nordeste',
+        'Facing East': 'Virado a Este',           'Facing South-East': 'Virado a Sudeste',
+        'Facing South (default)': 'Virado a Sul (padrão)',
+        'Facing South-West': 'Virado a Sudoeste', 'Facing West': 'Virado a Oeste',
+        'Facing North-West': 'Virado a Noroeste',
     },
     'it': {
         'LOCAL TIME': 'ORA LOCALE',         'LOCATION': 'POSIZIONE',
@@ -400,6 +419,11 @@ _TRANSLATIONS = {
         'Longitude (+E / -W)': 'Longitudine (+E / -O)',
         'Timezone': 'Fuso orario',
         'Save & Apply': 'Salva',
+        'Facing North': 'Rivolto a Nord',         'Facing North-East': 'Rivolto a Nord-Est',
+        'Facing East': 'Rivolto a Est',           'Facing South-East': 'Rivolto a Sud-Est',
+        'Facing South (default)': 'Rivolto a Sud (predefinito)',
+        'Facing South-West': 'Rivolto a Sud-Ovest','Facing West': 'Rivolto a Ovest',
+        'Facing North-West': 'Rivolto a Nord-Ovest',
     },
 }
 
@@ -444,6 +468,11 @@ def _month_name(month_1):
 
 def _fmt_date(dt):
     return f"{_day_name(dt.weekday())}  {dt.day:02d} {_month_name(dt.month)} {dt.year}"
+
+_PHASE_NAMES = [
+    'New Moon', 'Waxing Crescent', 'First Quarter', 'Waxing Gibbous',
+    'Full Moon', 'Waning Gibbous', 'Last Quarter', 'Waning Crescent',
+]
 
 # ─── Star catalog ─────────────────────────────────────────────────────────────
 # (ra_hours, dec_degrees, visual_magnitude, b_v_color_index)
@@ -1061,22 +1090,23 @@ def sky_to_screen(el, az, W, H):
 
 # ─── Weather ─────────────────────────────────────────────────────────────────
 
+_WMO_PRECIP = {
+    51: 0.2, 53: 0.5, 55: 1.2,
+    56: 0.3, 57: 0.8,
+    61: 0.4, 63: 1.5, 65: 4.0,
+    66: 0.4, 67: 1.5,
+    71: 0.3, 73: 0.8, 75: 2.0,
+    80: 0.5, 81: 2.0, 82: 5.0,
+    85: 0.3, 86: 1.0,
+    95: 3.0, 96: 4.0, 99: 5.0,
+}
+
 def fetch_open_meteo(lat, lon):
     """Fetch cloud layers and precipitation from Open-Meteo (no key needed)."""
     url = (f"https://api.open-meteo.com/v1/forecast"
            f"?latitude={lat:.4f}&longitude={lon:.4f}"
            f"&current=cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high"
            f",precipitation,snowfall,weather_code")
-    _WMO_PRECIP = {
-        51: 0.2, 53: 0.5, 55: 1.2,
-        56: 0.3, 57: 0.8,
-        61: 0.4, 63: 1.5, 65: 4.0,
-        66: 0.4, 67: 1.5,
-        71: 0.3, 73: 0.8, 75: 2.0,
-        80: 0.5, 81: 2.0, 82: 5.0,
-        85: 0.3, 86: 1.0,
-        95: 3.0, 96: 4.0, 99: 5.0,
-    }
     try:
         with urllib.request.urlopen(url, timeout=8) as r:
             data = json.loads(r.read())
@@ -1783,6 +1813,11 @@ class SkyTracker(Gtk.Window):
             return False   # same 15-min slot — nothing changed, skip redraw
         self._last_weather_ts = ts
         self._clouds = value
+        if self._selected_day:
+            all_h = value.get('hourly_forecast', [])
+            self._selected_day_slots = [
+                s for s in all_h if s.get('ts', '')[:10] == self._selected_day
+            ][:8]
         self.da.queue_draw()
         return False
 
@@ -2232,7 +2267,7 @@ class SkyTracker(Gtk.Window):
                             prev = pt
 
         for alt, az, mag, bv, ra_h, dec_deg in star_data:
-            pos = sky_to_screen(alt, az, W, H)
+            pos = star_screen.get((round(ra_h, 2), round(dec_deg, 1)))
             if pos is None:
                 continue
             sx, sy = pos
@@ -2402,7 +2437,7 @@ class SkyTracker(Gtk.Window):
             return None
         surf = cairo.ImageSurface(cairo.FORMAT_ARGB32, W, H)
         cr   = cairo.Context(surf)
-        # White background so the transparent overlay looks good as a wallpaper
+        # Black background so the sky renders correctly as a wallpaper
         cr.set_source_rgb(0.0, 0.0, 0.0)
         cr.paint()
         self._on_draw(self.da, cr)
@@ -3533,11 +3568,8 @@ class SkyTracker(Gtk.Window):
                  icon_fn=ic_solar_noon)
 
         if enabled.get('moon_phase'):
-            _phase_names = ['New Moon', 'Waxing Crescent', 'First Quarter',
-                            'Waxing Gibbous', 'Full Moon', 'Waning Gibbous',
-                            'Last Quarter', 'Waning Crescent']
             el_str = f'  El: {m_el:+.1f}' if m_el is not None else ''
-            emit(_t('MOON PHASE'), _t(_phase_names[int(phase * 8) % 8]),
+            emit(_t('MOON PHASE'), _t(_PHASE_NAMES[int(phase * 8) % 8]),
                  f'Age: {age:.1f}d{el_str}', icon_fn=ic_moon_phase)
 
         if enabled.get('moon_rise_set'):
@@ -3652,16 +3684,16 @@ def _tz_index(offset):
     return best
 
 # ─── Facing-direction options ────────────────────────────────────────────────
-# (azimuth_degrees, display_label)
+# (azimuth_degrees, compass_abbrev, direction_i18n_key)
 _FACING_OPTIONS = [
-    (  0, 'N  — Facing North'),
-    ( 45, 'NE — Facing North-East'),
-    ( 90, 'E  — Facing East'),
-    (135, 'SE — Facing South-East'),
-    (180, 'S  — Facing South  (default)'),
-    (225, 'SW — Facing South-West'),
-    (270, 'W  — Facing West'),
-    (315, 'NW — Facing North-West'),
+    (  0, 'N',  'Facing North'),
+    ( 45, 'NE', 'Facing North-East'),
+    ( 90, 'E',  'Facing East'),
+    (135, 'SE', 'Facing South-East'),
+    (180, 'S',  'Facing South (default)'),
+    (225, 'SW', 'Facing South-West'),
+    (270, 'W',  'Facing West'),
+    (315, 'NW', 'Facing North-West'),
 ]
 
 # ─── Settings dialog ──────────────────────────────────────────────────────────
@@ -3917,8 +3949,8 @@ class SettingsDialog(Gtk.Window):
             box.pack_start(Gtk.Label(label=_t('Screen facing direction'), xalign=0), False, False, 2)
             self._facing_combo = Gtk.ComboBoxText()
             cur_facing = float(self.cfg.get('facing', 180.0))
-            for _, lbl in _FACING_OPTIONS:
-                self._facing_combo.append_text(lbl)
+            for _, abbrev, dir_key in _FACING_OPTIONS:
+                self._facing_combo.append_text(f'{abbrev}  — {_t(dir_key)}')
             best_i = min(range(len(_FACING_OPTIONS)),
                          key=lambda i: abs(_FACING_OPTIONS[i][0] - cur_facing))
             self._facing_combo.set_active(best_i)
@@ -4034,6 +4066,8 @@ class SettingsDialog(Gtk.Window):
                 self.cfg['timezone_offset'] = _TZ_LIST[idx][0]
             save_config(self.cfg)
             self.par._refresh_day()
+            self.par._selected_day       = None
+            self.par._selected_day_slots = []
             self.par._fetch_weather_async()
             self.par._city_name = None
             self.par._fetch_city_name()

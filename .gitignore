@@ -3,7 +3,10 @@ __pycache__/
 *.pyo
 .env
 *.log
+caelum-lockscreen.png
 sky-tracker-lockscreen.png
 photo_*.jpg
 photo_*.png
+config.json
+TASK_SPECIFICATION.md
 .claude/
