@@ -379,3 +379,18 @@ Or via tmux alias: `work-sky` (attaches to existing session or creates new one i
 
 ### i18n
 3. **`'click to set facing'` compass label not translated** — Hardcoded English string in `_draw_compass`. Added to all 5 language dicts and wrapped with `_t()`.
+
+---
+
+## Session 8 — Independent weather timers per source
+
+**Goal:** User clarified the original 60 s timer was intentional; requested separate intervals per source.
+
+### Refactor
+- **Split `_fetch_weather_async` into two independent paths:**
+  - `_fetch_om_async` — Open-Meteo, every **15 minutes** (current conditions: clouds, precipitation, WMO code)
+  - `_fetch_met_async` — MET Norway, every **1 hour** (forecast, hourly accordion, temperature, wind, symbol)
+- Each path has its own dedup flag (`_om_fetching`, `_met_fetching`) and caches its last raw result (`_last_om`, `_last_met`).
+- On completion, either path calls `merge_weather(_last_om, _last_met)` so the merged view always uses the freshest data from both sources simultaneously.
+- `_fetch_weather_async` kept as a combined helper (startup + location change); it now just calls both sub-fetchers.
+- `_save` clears `_last_om` and `_last_met` when location changes so stale data from the old location is not merged with fresh data for the new one.
