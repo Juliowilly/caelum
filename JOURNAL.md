@@ -653,3 +653,7 @@ caelum/gtk_ui/    window.py  settings.py  clouds.py  autostart.py  app.py
   state, fixed with `snapcraft clean caelum` (keeps the downloaded GNOME SDK).
 - **Built `caelum_1.1.0_amd64.snap` (3.1 MB)**: launcher, cpython-312 `_gi`, desktop entry with the
   `${SNAP}` icon, plugs network + gsettings (+ gnome extension set), no linter warnings, no kivy_ui.
+- User tested the local snap (`snap install --dangerous`): works.
+- **Uploaded to the Snap Store: revision 1 → `latest/beta`** (amd64), passed automated review in ~1 min.
+  https://snapcraft.io/caelum. Store listing had no icon: added top-level `icon:` to snapcraft.yaml
+  (ships with the next revision). Screenshots must be added on the web listing page.

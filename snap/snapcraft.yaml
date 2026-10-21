@@ -1,5 +1,6 @@
 name: caelum
 title: Caelum
+icon: data/io.github.juliowilly.Caelum.svg   # store listing icon (the in-snap icon is separate)
 base: core24
 adopt-info: caelum
 summary: Live sky overlay for your desktop

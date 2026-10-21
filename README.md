@@ -31,7 +31,7 @@ A native desktop widget that turns your screen background into a live, photoreal
 | | |
 |---|---|
 | **Ubuntu PPA** (24.04, 26.04) | `sudo add-apt-repository ppa:juliowilly/caelum && sudo apt install caelum` |
-| **Snap Store** *(coming soon)* | `sudo snap install caelum` |
+| **Snap Store** *(beta)* | `sudo snap install caelum --beta` |
 | **Flathub** *(coming soon)* | `flatpak install flathub io.github.juliowilly.Caelum` |
 | **.deb** | download from [Releases](https://github.com/Juliowilly/caelum/releases), then `sudo apt install ./caelum_*_all.deb` |
 
