@@ -614,3 +614,16 @@ caelum/gtk_ui/    window.py  settings.py  clouds.py  autostart.py  app.py
   its UID had a typo (`cjw.` instead of `jw.`), to be corrected before publishing to the keyserver.
 - Maintainer email changed to **jw.adamagaba@gmail.com** in `debian/{control,changelog,copyright}`
   (user's choice, used everywhere from now on).
+
+### Step 6 — Launchpad PPA (`ppa:juliowilly/caelum`)
+- New signing key (correct UID `jw.adamagaba@gmail.com`), fingerprint
+  `8ADAFA29057A27BE2DD54CC839C70230203512C3`; the typo key was never published.
+  `gpg --send-keys` silently didn't land, so it was uploaded via `POST /pks/add` (HTTP 200, "inserted").
+- Launchpad sent the confirmation **unencrypted**: the key is sign-only, so instead of decrypting a
+  mail you clear-sign the paragraph shown on the token page and paste the signed block back.
+- `packaging/ppa-upload.sh [--upload] [REV]`: builds from HEAD only (refuses a dirty tree), makes one
+  `orig.tar.gz` (git archive minus debian/) shared by all series, and creates per-series versions
+  `1.1.0-1~ubuntu24.04.1` (noble) / `~ubuntu26.04.1` (resolute). First upload uses `-sa`, the rest `-sd`;
+  signed with `-k <fingerprint>`.
+- Lintian: added a CC0-1.0 stanza for the metainfo file in debian/copyright (it was flagged as
+  inconsistent with MIT). `binary-nmu-debian-revision-in-source` is a false positive of the PPA version format.
