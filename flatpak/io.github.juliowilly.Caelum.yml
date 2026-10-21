@@ -1,0 +1,33 @@
+# Local build: flatpak run org.flatpak.Builder --user --install --force-clean build-dir flatpak/io.github.juliowilly.Caelum.yml
+# The Flathub copy of this manifest uses a git source pinned to a release tag instead of `dir`.
+id: io.github.juliowilly.Caelum
+runtime: org.gnome.Platform
+runtime-version: '51'
+sdk: org.gnome.Sdk
+command: caelum
+finish-args:
+  - --share=network        # weather, geolocation, phone compass URL
+  - --share=ipc
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --device=dri
+modules:
+  - name: caelum
+    buildsystem: simple
+    build-commands:
+      # The GNOME runtime already provides Python, PyGObject and pycairo
+      - pip3 install --prefix=${FLATPAK_DEST} --no-deps --no-build-isolation --no-index .
+      - install -Dm644 data/${FLATPAK_ID}.desktop -t ${FLATPAK_DEST}/share/applications
+      - install -Dm644 data/${FLATPAK_ID}.svg -t ${FLATPAK_DEST}/share/icons/hicolor/scalable/apps
+      - install -Dm644 data/${FLATPAK_ID}.metainfo.xml -t ${FLATPAK_DEST}/share/metainfo
+    sources:
+      - type: dir
+        path: ..
+        skip:
+          - .git
+          - .venv-kivy
+          - .buildozer
+          - build
+          - dist
+          - build-dir
+          - .flatpak-builder

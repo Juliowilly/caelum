@@ -1,0 +1,66 @@
+name: caelum
+title: Caelum
+base: core24
+adopt-info: caelum
+summary: Live sky overlay for your desktop
+description: |
+  Caelum turns your desktop background into a live sky: the real position of the
+  sun, moon, planets and stars for your location, with clouds, rain and snow from
+  live weather data (Open-Meteo and MET Norway, no API key needed).
+
+  - 240° panorama centred on your screen's real-world facing direction
+  - Moon phase with correct crescent orientation for your latitude
+  - Weekly and hourly forecast
+  - Optional export of the sky as wallpaper / lock screen
+license: MIT
+grade: stable
+confinement: strict
+website: https://github.com/Juliowilly/caelum
+source-code: https://github.com/Juliowilly/caelum
+issues: https://github.com/Juliowilly/caelum/issues
+contact: https://github.com/Juliowilly/caelum/issues
+
+platforms:
+  amd64:
+  arm64:
+
+apps:
+  caelum:
+    command: usr/bin/python3 -m caelum
+    desktop: usr/share/applications/io.github.juliowilly.Caelum.desktop
+    common-id: io.github.juliowilly.Caelum
+    # snapd starts this when ~/snap/caelum/current/.config/autostart/caelum.desktop exists
+    autostart: caelum.desktop
+    extensions: [gnome]
+    plugs:
+      - network        # weather, geolocation, phone compass URL
+      - gsettings      # wallpaper / lock-screen export
+    environment:
+      PYTHONPATH: $SNAP/usr/lib/python3/dist-packages
+
+parts:
+  caelum:
+    plugin: nil
+    source: .
+    # Interpreter and bindings from Ubuntu 24.04; GTK itself comes from the gnome extension
+    stage-packages:
+      - python3
+      - python3-gi
+      - python3-gi-cairo
+    override-build: |
+      craftctl default
+      SITE="$CRAFT_PART_INSTALL/usr/lib/python3/dist-packages"
+      find caelum -name '*.py' -not -path 'caelum/kivy_ui/*' -exec install -D -m 644 {} "$SITE/{}" \;
+      install -D -m 644 data/io.github.juliowilly.Caelum.svg \
+        "$CRAFT_PART_INSTALL/usr/share/icons/hicolor/scalable/apps/io.github.juliowilly.Caelum.svg"
+      install -D -m 644 data/io.github.juliowilly.Caelum.metainfo.xml \
+        "$CRAFT_PART_INSTALL/usr/share/metainfo/io.github.juliowilly.Caelum.metainfo.xml"
+      # Snap desktop files need an absolute icon path
+      install -D -m 644 data/io.github.juliowilly.Caelum.desktop \
+        "$CRAFT_PART_INSTALL/usr/share/applications/io.github.juliowilly.Caelum.desktop"
+      sed -i 's#^Icon=.*#Icon=${SNAP}/usr/share/icons/hicolor/scalable/apps/io.github.juliowilly.Caelum.svg#' \
+        "$CRAFT_PART_INSTALL/usr/share/applications/io.github.juliowilly.Caelum.desktop"
+      craftctl set version="$(sed -n "s/^__version__ = '\(.*\)'/\1/p" caelum/__init__.py)"
+    prime:
+      - -usr/share/doc
+      - -usr/share/man

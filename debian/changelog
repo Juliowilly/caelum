@@ -1,0 +1,6 @@
+caelum (1.1.0-1) unstable; urgency=medium
+
+  * New upstream release 1.1.0.
+  * Initial Debian source packaging (pybuild), for the Launchpad PPA.
+
+ -- Juliowilly <carlostoscani1@gmail.com>  Wed, 21 Oct 2026 14:34:11 +0000

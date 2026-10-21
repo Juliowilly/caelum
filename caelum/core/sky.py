@@ -24,12 +24,15 @@ def _seg_dist(px, py, ax, ay, bx, by):
 def sky_to_screen(el, az, W, H):
     """
     Panoramic projection: 240° wide, centred on _FACING azimuth.
-    Returns None when body is below the horizon.
+    Returns None when body is below the horizon or outside the 240° field of view
+    (clamping would pile those objects up along the screen edges).
     """
     if el < 0:
         return None
     rel = ((az - _FACING + 180.0) % 360.0) - 180.0   # -180..+180, 0 = centre
-    t   = _clamp((rel + 120.0) / 240.0, 0.0, 1.0)
+    if abs(rel) > 120.0:
+        return None
+    t   = (rel + 120.0) / 240.0
     x   = W * 0.06 + t * (W * 0.88)
     y   = H * 0.72 - (H * 0.66) * _clamp(el / 90.0, 0.0, 1.0)
     return x, y

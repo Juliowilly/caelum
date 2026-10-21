@@ -16,3 +16,11 @@ dist/
 .venv-kivy/
 .buildozer/
 bin/
+build-dir/
+.flatpak-builder/
+repo/
+*.flatpak
+*.snap
+parts/
+prime/
+stage/

@@ -28,16 +28,16 @@ A native desktop widget that turns your screen background into a live, photoreal
 
 ## Install
 
-### Debian / Ubuntu (.deb)
+| | |
+|---|---|
+| **Flathub** | `flatpak install flathub io.github.juliowilly.Caelum` |
+| **Snap Store** | `sudo snap install caelum` |
+| **Ubuntu PPA** | `sudo add-apt-repository ppa:juliowilly/caelum && sudo apt install caelum` |
+| **.deb** | download from [Releases](https://github.com/Juliowilly/caelum/releases), then `sudo apt install ./caelum_*_all.deb` |
 
-Download `caelum_<version>_all.deb` from the [Releases](https://github.com/Juliowilly/caelum/releases) page, or build it yourself (see below), then:
-
-```bash
-sudo apt install ./caelum_1.0.1_all.deb
-caelum &
-```
-
-apt pulls in the GTK dependencies. Caelum then appears in the app grid.
+Inside Flatpak and Snap the hardware compass sensors (IIO, USB serial) are not available; the
+phone compass over the network works everywhere. Wallpaper export and autostart use the
+desktop portals under Flatpak.
 
 ### pipx
 
@@ -78,12 +78,14 @@ Build an APK with [Buildozer](https://buildozer.readthedocs.io): `buildozer andr
 ## Building packages
 
 ```bash
-make deb      # → dist/caelum_<version>_all.deb  (needs only dpkg-deb)
-make wheel    # → dist/caelum-<version>-py3-none-any.whl
+make test     # unit tests
+make deb      # → dist/caelum_<version>_all.deb   (debian/, needs devscripts dh-python pybuild-plugin-pyproject)
+make snap     # → caelum_<version>_amd64.snap     (snap/snapcraft.yaml, needs snapcraft + LXD)
+make flatpak  # builds and installs the Flatpak    (flatpak/…yml, needs org.flatpak.Builder + GNOME 51 SDK)
 make clean
 ```
 
-The version comes from `caelum/__init__.py`.
+The version comes from `caelum/__init__.py` (and `debian/changelog` for the .deb).
 
 ## Project layout
 
@@ -94,7 +96,10 @@ caelum/
   kivy_ui/    mobile front-end (Kivy): sky canvas, gradient textures, phone sensors
 main.py       Android entry point (required by Buildozer)
 tests/        python3 -m unittest discover -s tests
-data/         .desktop entry, icon, AppStream metainfo
+data/         .desktop entry, icon, AppStream metainfo, store screenshots
+debian/       Debian source package (PPA + make deb)
+snap/         snapcraft.yaml
+flatpak/      Flatpak manifest (local build; the Flathub copy pins a git tag)
 packaging/    build-deb.sh
 ```
 

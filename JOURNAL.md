@@ -564,3 +564,44 @@ caelum/gtk_ui/    window.py  settings.py  clouds.py  autostart.py  app.py
   launches it through snapcraft.yaml `autostart:`), with `Exec=caelum`. Flatpak uses the Background portal
   (`RequestBackground`, `autostart`, `commandline=['caelum']`), with the choice remembered in a marker file.
 - Tested with `GSETTINGS_BACKEND=memory` (real wallpaper untouched); GTK app still runs.
+
+### Step 2 — Debian source package (`debian/`, for the PPA and `make deb`)
+- debhelper 13 + pybuild + `pybuild-plugin-pyproject`; `dh-sequence-python3` is required in Build-Depends.
+  Without it dh_python3 never ran: files landed in `python3.14/dist-packages` with stray `__pycache__`
+  and no `python3` dependency. Depends are now computed (`python3:any`, `python3-gi`, `python3-cairo`).
+- Unit tests run during the build (`PYBUILD_TEST_ARGS=-s tests -v`; pybuild already supplies
+  `-m unittest discover`). Lintian: only `initial-upload-closes-no-bugs` and `no-manual-page`.
+- `packaging/build-deb.sh` now runs `dpkg-buildpackage` on a copy of the tree (tracked + new,
+  non-ignored files). The hand-rolled dpkg-deb script is gone, leaving one recipe for GitHub and the PPA.
+- pyproject `license` switched to the table form: Ubuntu 24.04 has setuptools 68, which predates PEP 639.
+
+### Step 3 — Flatpak (`flatpak/io.github.juliowilly.Caelum.yml`)
+- GNOME 51 runtime (it provides Python, PyGObject and pycairo); pip installs the package offline.
+- Tools installed per-user: added a `--user` Flathub remote (only the system one existed), then
+  `org.flatpak.Builder` + `org.gnome.Platform//51` + `org.gnome.Sdk//51`.
+- `--disable-rofiles-fuse` needed (FUSE helper can't start when the builder itself is a Flatpak).
+- Runs; `sandbox.kind()` = flatpak inside; icon found. The wallpaper/autostart portals have not been
+  exercised yet (that would change the real desktop), so they await a manual test.
+- flatpak-builder-lint: manifest clean; build only fails `appstream-missing-screenshots`, because the
+  screenshot URLs point at the not-yet-pushed `v1.1.0` tag.
+
+### Step 4 — Snap (`snap/snapcraft.yaml`)
+- core24 + gnome extension; stage `python3`, `python3-gi`, `python3-gi-cairo` from 24.04; plugs
+  `network`, `gsettings`; `autostart: caelum.desktop`; desktop Icon rewritten to `${SNAP}/…`.
+- First LXD build failed: "Timed out waiting for networking". The container got IPv6 but no IPv4
+  because **ufw blocks DHCP on lxdbr0**. Fix (user, sudo): allow in + route in/out on lxdbr0.
+
+### Bugs found while making store screenshots (pre-existing, fixed in core)
+- **Objects outside the 240° view piled up on the screen edges**: `sky_to_screen` clamped azimuth
+  instead of hiding, so stars behind the viewer formed vertical columns at x≈6% and x≈94%, and
+  constellation lines spanned the whole screen between them. Now returns None outside ±120°.
+- **Moon phase name was rounded down**: `int(phase*8)` called a 10.7-day moon "First Quarter".
+  New `astronomy.phase_index()` rounds to the nearest of the 8 names (used by GTK and Kivy).
+- `tests/test_sky.py`: projection edges, out-of-view, below-horizon, phase naming (10 tests total).
+
+### Metadata for the stores
+- Screenshots rendered off-screen by a scratch script (fixed UTC time, clear sky, real forecast):
+  `data/screenshots/night.png`, `dusk.png`.
+- metainfo: screenshots, branding colours, display/controls, bugtracker/VCS URLs, 1.1.0 release notes;
+  compass bullet reworded (hardware sensors aren't available in sandboxes).
+- Version **1.1.0** (`caelum/__init__.py`, `debian/changelog` 1.1.0-1, metainfo).

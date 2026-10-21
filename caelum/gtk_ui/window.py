@@ -17,6 +17,7 @@ from gi.repository import Gtk, Gdk, GLib
 import cairo
 
 from ..core.astronomy import (
+    phase_index,
     _PLANET_MAG, _bv_to_rgb, _find_event, _find_moon_event, _get_star_positions,
     _ra_dec_to_alt_az, _solar_noon, moon_phase_age, moon_position,
     planet_positions, solar_position,
@@ -2096,7 +2097,7 @@ class SkyTracker(Gtk.Window):
 
         if enabled.get('moon_phase'):
             el_str = f'  El: {m_el:+.1f}' if m_el is not None else ''
-            emit(_t('MOON PHASE'), _t(_PHASE_NAMES[int(phase * 8) % 8]),
+            emit(_t('MOON PHASE'), _t(_PHASE_NAMES[phase_index(phase)]),
                  f'Age: {age:.1f}d{el_str}', icon_fn=ic_moon_phase)
 
         if enabled.get('moon_rise_set'):

@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,8 +7,8 @@ name = "caelum"
 dynamic = ["version"]
 description = "Live sky overlay for the Linux desktop: sun, moon, planets, stars and weather for your location"
 readme = "README.md"
-license = "MIT"
-license-files = ["LICENSE"]
+# Table form: Ubuntu 24.04 (PPA target) ships setuptools 68, which predates the PEP 639 string form
+license = { text = "MIT" }
 authors = [{ name = "Juliowilly" }]
 requires-python = ">=3.8"
 # PyGObject and pycairo build from source on PyPI; install the distro packages
@@ -17,6 +17,7 @@ dependencies = ["PyGObject", "pycairo"]
 classifiers = [
     "Environment :: X11 Applications :: GTK",
     "Operating System :: POSIX :: Linux",
+    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Topic :: Scientific/Engineering :: Astronomy",
 ]

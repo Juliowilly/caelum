@@ -195,6 +195,10 @@ def _solar_noon(lat, lon, date, tz_off):
             best_el, best_m = el, m
     return datetime.time(best_m // 60, best_m % 60), best_el
 
+def phase_index(phase):
+    """Nearest of the 8 named phases (_PHASE_NAMES) for a phase fraction 0..1 (0 = new moon)."""
+    return int(phase * 8 + 0.5) % 8
+
 def moon_phase_age(dt_utc):
     known_new = datetime.datetime(2000, 1, 6, 18, 14)
     synodic   = 29.530588853

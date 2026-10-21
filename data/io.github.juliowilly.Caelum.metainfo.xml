@@ -14,16 +14,51 @@
       <li>240° panorama centred on your screen's real-world facing direction</li>
       <li>Moon phase with correct crescent orientation for your latitude</li>
       <li>Weekly and hourly forecast from Open-Meteo and MET Norway (no API key)</li>
-      <li>Compass support: hardware sensor, USB serial, or phone over the network</li>
+      <li>Constellation lines, Milky Way, planets and meteors on clear nights</li>
+      <li>Optional live compass from your phone over the network</li>
+      <li>Can export the sky as your wallpaper and lock screen</li>
     </ul>
   </description>
   <launchable type="desktop-id">io.github.juliowilly.Caelum.desktop</launchable>
   <url type="homepage">https://github.com/Juliowilly/caelum</url>
+  <url type="bugtracker">https://github.com/Juliowilly/caelum/issues</url>
+  <url type="vcs-browser">https://github.com/Juliowilly/caelum</url>
   <developer id="io.github.juliowilly">
     <name>Juliowilly</name>
   </developer>
   <content_rating type="oars-1.1"/>
+  <branding>
+    <color type="primary" scheme_preference="light">#8fa6e8</color>
+    <color type="primary" scheme_preference="dark">#1b2156</color>
+  </branding>
+  <requires>
+    <display_length compare="ge">768</display_length>
+  </requires>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </supports>
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.1.0/data/screenshots/night.png</image>
+      <caption>A clear night with constellations, planets, the Milky Way and the weekly forecast</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.1.0/data/screenshots/dusk.png</image>
+      <caption>Twilight with the waxing moon, Saturn and Mercury</caption>
+    </screenshot>
+  </screenshots>
   <releases>
+    <release version="1.1.0" date="2026-10-21">
+      <description>
+        <p>Available on Flathub, the Snap Store and a Launchpad PPA.</p>
+        <ul>
+          <li>Wallpaper export and autostart work inside Flatpak and Snap</li>
+          <li>Objects outside the 240° view are hidden instead of piling up at the screen edges</li>
+          <li>Moon phase name now matches the nearest phase (e.g. Waxing Gibbous at 10 days)</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.0.1" date="2026-10-21">
       <description><p>App icon now shown on Caelum windows (dock, Alt+Tab), also when run from source.</p></description>
     </release>

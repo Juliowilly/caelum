@@ -19,6 +19,7 @@ from kivy.metrics import dp
 from kivy.uix.widget import Widget
 
 from ..core.astronomy import (
+    phase_index,
     _PLANET_MAG, _bv_to_rgb, _get_star_positions, _ra_dec_to_alt_az,
     moon_phase_age, moon_position, planet_positions, solar_position,
 )
@@ -422,7 +423,7 @@ class SkyView(Widget):
         pad, s = dp(16), dp(1)
         self._text(now.strftime('%H:%M'), pad, pad, 34 * s, (1, 1, 1, 0.90))
         self._text(_fmt_date(now), pad, pad + 44 * s, 14 * s, (1, 1, 1, 0.70))
-        self._text(_t(_PHASE_NAMES[int(phase * 8) % 8]), pad, pad + 64 * s, 14 * s, (0.96, 0.94, 0.86, 0.70))
+        self._text(_t(_PHASE_NAMES[phase_index(phase)]), pad, pad + 64 * s, 14 * s, (0.96, 0.94, 0.86, 0.70))
         src = _t('compass') if self.compass and self.compass.available else _t('drag to look around')
         hdg = f'{_DIRS[int((self.facing + 22.5) % 360 // 45)]}  {self.facing:.0f}°  ·  {src}'
         self._text(hdg, pad, pad + 84 * s, 12 * s, (0.75, 0.85, 1.0, 0.60))

@@ -1,0 +1,28 @@
+Source: caelum
+Section: science
+Priority: optional
+Maintainer: Juliowilly <carlostoscani1@gmail.com>
+Build-Depends: debhelper-compat (= 13),
+               dh-python,
+               dh-sequence-python3,
+               pybuild-plugin-pyproject,
+               python3-all,
+               python3-setuptools
+Standards-Version: 4.7.0
+Homepage: https://github.com/Juliowilly/caelum
+Vcs-Browser: https://github.com/Juliowilly/caelum
+Vcs-Git: https://github.com/Juliowilly/caelum.git
+Rules-Requires-Root: no
+
+Package: caelum
+Architecture: all
+Depends: ${misc:Depends},
+         ${python3:Depends},
+         gir1.2-gtk-3.0,
+         python3-gi,
+         python3-gi-cairo
+Suggests: iio-sensor-proxy, python3-dbus, python3-serial
+Description: live sky overlay for the Linux desktop
+ Caelum turns the desktop background into a live sky showing the real
+ position of the sun, moon, planets and stars for your location, with
+ clouds, rain and snow from live weather data (Open-Meteo, MET Norway).
