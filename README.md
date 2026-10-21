@@ -22,19 +22,59 @@ A native desktop widget that turns your screen background into a live, photoreal
 - **Clean mode** — hide all cards with Ctrl+H
 - **Lockscreen/wallpaper export** — save the live sky frame as your desktop background
 
-## Requirements
+## Install
+
+### Debian / Ubuntu (.deb)
+
+Download `caelum_<version>_all.deb` from the [Releases](https://github.com/Juliowilly/caelum/releases) page, or build it yourself (see below), then:
+
+```bash
+sudo apt install ./caelum_1.0.0_all.deb
+caelum &
+```
+
+apt pulls in the GTK dependencies. Caelum then appears in the app grid.
+
+### pipx
 
 ```bash
 sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-3.0
+pipx install --system-site-packages git+https://github.com/Juliowilly/caelum
+caelum &
 ```
 
-## Run
+`--system-site-packages` lets the venv use the distro's PyGObject/pycairo instead of compiling them.
+
+### From source
 
 ```bash
-python3 desktop_tracker.py &
+sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-3.0
+python3 -m caelum &          # or: python3 desktop_tracker.py
 ```
 
-Or set it to start automatically with GNOME via the Settings dialog (gear button → Start with GNOME session).
+Start automatically with GNOME via Settings → *Start with GNOME session*.
+
+## Building packages
+
+```bash
+make deb      # → dist/caelum_<version>_all.deb  (needs only dpkg-deb)
+make wheel    # → dist/caelum-<version>-py3-none-any.whl
+make clean
+```
+
+The version comes from `caelum/__init__.py`.
+
+## Project layout
+
+```
+caelum/
+  core/       platform-agnostic: astronomy, weather, config, i18n, star catalog, sky palettes
+  gtk_ui/     Linux desktop front-end: GTK window, Cairo drawing, settings dialog, autostart
+data/         .desktop entry, icon, AppStream metainfo
+packaging/    build-deb.sh
+```
+
+`caelum/core` must never import GTK or Cairo, so it can be reused by the planned Kivy mobile port.
 
 ## Configuration
 
@@ -45,13 +85,13 @@ Right-click or click the gear button (bottom-right) to open Settings:
 - Facing direction (or live compass from phone via [PhyPhox](https://phyphox.org))
 - Toggle individual cards and visual features
 
-Settings are saved to `config.json` in the app directory.
+Settings are saved to `~/.config/caelum/config.json` (an older `config.json` next to `desktop_tracker.py` is migrated automatically on first run).
 
 ## Phone Compass (PhyPhox)
 
 1. Install [PhyPhox](https://phyphox.org) on your phone
 2. Start the Magnetometer experiment and enable Remote Access
-3. Run the bridge on your laptop:
+3. Run the bridge on your laptop (`compass_bridge.py` is in the source repository, not the .deb):
    ```bash
    python3 compass_bridge.py http://<phone-ip>:8080
    ```

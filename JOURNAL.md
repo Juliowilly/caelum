@@ -412,3 +412,65 @@ sun/moon, weather icons, weekly forecast, HUD cards, SettingsDialog).
 - On completion, either path calls `merge_weather(_last_om, _last_met)` so the merged view always uses the freshest data from both sources simultaneously.
 - `_fetch_weather_async` kept as a combined helper (startup + location change); it now just calls both sub-fetchers.
 - `_save` clears `_last_om` and `_last_met` when location changes so stale data from the old location is not merged with fresh data for the new one.
+
+---
+
+## Session 10 — Multi-platform strategy, package split, Linux packaging
+
+**Goal:** Decide the mobile framework and the Linux packaging path, then implement packaging.
+
+### Decision 1 — Mobile framework: **Kivy**
+| Need | Kivy | BeeWare (Toga) |
+|---|---|---|
+| Cairo-style drawing (11 radial + ~8 linear gradients, hundreds of puffs, 10 fps) | OpenGL canvas, fast; gradients via textures/shaders → drawing layer rewritten | `toga.Canvas` has no radial gradients, slow with many shapes → **disqualifying** |
+| Compass / GPS | `plyer.compass`, `plyer.gps` (Android + iOS) | Location yes, compass needs native bridge code |
+| Background service | python-for-android services | weak |
+| Native widgets | not native (only the settings screen needs any) | strength, but barely used here |
+
+- The app is ~95% custom canvas, so Kivy wins. Mobile app = full-screen sky app.
+- **Not possible with either:** an Android *live wallpaper* (needs a Java/Kotlin `WallpaperService`).
+  iOS has no third-party live wallpapers at all. Revisit later as a Kotlin shell + Chaquopy if wanted.
+- Correction to an earlier note: Python apps *can* ship on the iOS App Store (both Kivy and BeeWare embed CPython).
+
+### Decision 2 — Linux packaging: **pyproject.toml + .deb**
+- pyproject: standard, gives a `caelum` command, prerequisite for everything else.
+- .deb: native for Ubuntu; apt resolves `python3-gi`, `python3-gi-cairo`, `gir1.2-gtk-3.0`.
+- Flatpak deferred: sandbox conflicts with `gsettings` wallpaper export, autostart file writing,
+  `/sys` IIO and serial compass access.
+- Install-script-only rejected: no upgrade/uninstall story.
+
+### Package split (`desktop_tracker.py` → `caelum/`)
+Split mechanically by line ranges (no code retyped); pyflakes clean before and after.
+```
+caelum/core/      config.py  weather.py  sky.py  i18n.py  catalog.py  astronomy.py   (no GTK/Cairo imports)
+caelum/gtk_ui/    window.py  settings.py  clouds.py  autostart.py  app.py
+```
+- `_FACING` module global → `core.sky.set_facing()` / `get_facing()` (a `global` can't cross modules).
+- `desktop_tracker.py` is now a compatibility shim, so existing autostart entries and
+  `python3 desktop_tracker.py` keep working. Also runnable as `python3 -m caelum`.
+
+### Installed-app fixes
+- **Config moved to `$XDG_CONFIG_HOME/caelum/config.json`** (`~/.config/caelum/`). The package dir is read-only
+  once installed. The old `config.json` beside `desktop_tracker.py` is copied over on first run (tested: byte-identical).
+- **Autostart `Exec`** now uses the installed `caelum` command if on PATH, else `python3 -m caelum` with `Path=` set
+  to the checkout. Previously it hardcoded `python3 <__file__>`, which would break inside a package.
+- **`locale.getdefaultlocale()` replaced** with an env lookup (LC_ALL → LC_MESSAGES → LANG → LANGUAGE).
+  It is removed in Python 3.15 and the exception was swallowed, so "auto" language would have silently become English.
+- `config.json` untracked (`git rm --cached`). It was added to `.gitignore` in Session 6 but never removed from the index.
+
+### Packaging files
+- `pyproject.toml` (setuptools, `caelum` gui-script, version from `caelum/__init__.py` = 1.0.0, extra `[compass]`)
+- `data/io.github.juliowilly.Caelum.{desktop,svg,metainfo.xml}`. desktop-file-validate and appstreamcli both pass.
+- `packaging/build-deb.sh` builds with `dpkg-deb --root-owner-group` only (no debhelper). It installs to
+  `/usr/lib/python3/dist-packages/caelum`, `/usr/bin/caelum`, and the share dirs; postinst runs `py3compile`, prerm runs `py3clean`.
+  Forces `umask 022` (this machine's umask 002 produced group-writable dirs).
+- `Makefile`: `run`, `deb`, `wheel`, `clean`.
+
+### Verified
+- App runs from the extracted .deb, via the shim, and via a `pipx install --system-site-packages .` with no tracebacks.
+- Machine is now on **Ubuntu 26.04.1 LTS** with Python 3.14.
+
+### Next session
+- Install the .deb locally and test (`sudo apt install ./dist/caelum_1.0.0_all.deb`). Optionally publish as a GitHub Release.
+- Start the Kivy front-end (`caelum/kivy_ui/`) on top of `caelum/core`: projection + sky gradient + sun/moon first,
+  then clouds via a soft-puff texture.

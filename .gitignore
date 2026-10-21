@@ -10,3 +10,6 @@ photo_*.png
 config.json
 TASK_SPECIFICATION.md
 .claude/
+build/
+dist/
+*.egg-info/

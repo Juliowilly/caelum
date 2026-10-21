@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Caelum
+GenericName=Sky Tracker
+Comment=Live sky overlay: sun, moon, planets, stars and weather for your location
+Exec=caelum
+Icon=io.github.juliowilly.Caelum
+Terminal=false
+Categories=Science;Astronomy;
+Keywords=sky;sun;moon;stars;planets;weather;astronomy;wallpaper;
+StartupNotify=false

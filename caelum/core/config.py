@@ -1,0 +1,86 @@
+"""Configuration: defaults, load/save (XDG config dir)."""
+
+import json
+import os
+import shutil
+
+from .i18n import _set_lang
+
+_CONFIG_DIR = os.path.join(os.environ.get('XDG_CONFIG_HOME') or os.path.expanduser('~/.config'),
+                           'caelum')
+CONFIG_PATH = os.path.join(_CONFIG_DIR, 'config.json')
+# Before packaging, config.json lived next to desktop_tracker.py in the source checkout
+_LEGACY_CONFIG_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'config.json')
+
+DEFAULT_CONFIG = {
+    "latitude": 6.1375,
+    "longitude": 1.2123,
+    "timezone_offset": 0,
+    "aster_scale": 1.0,
+    "cards": {
+        "clock": True,
+        "location": True,
+        "sunrise_sunset": True,
+        "solar_noon": True,
+        "moon_phase": True,
+        "moon_rise_set": True,
+        "daylight_remaining": True,
+        "cloud_cover": True
+    },
+    "clean_mode": False,
+    "keep_above": False,
+    "sticky": True,
+    "show_constellations": True,
+    "show_silhouette": True,
+    "show_compass": True,
+    "show_horizon_labels": True,
+    "show_rainbow": True,
+    "show_info_cards": False,
+    "show_weekly_forecast": True,
+    "language": "auto",
+    "lockscreen_export": "off",
+    "facing": 180.0,
+    "compass_port": "",
+    "app_enabled": True
+}
+
+# ─── Config ──────────────────────────────────────────────────────────────────
+
+def _migrate_legacy_config():
+    """Copy a pre-packaging config.json into the XDG config dir on first run."""
+    if os.path.exists(CONFIG_PATH) or not os.path.exists(_LEGACY_CONFIG_PATH):
+        return
+    try:
+        os.makedirs(_CONFIG_DIR, exist_ok=True)
+        shutil.copy2(_LEGACY_CONFIG_PATH, CONFIG_PATH)
+    except OSError:
+        pass
+
+def load_config():
+    _migrate_legacy_config()
+    if os.path.exists(CONFIG_PATH):
+        try:
+            with open(CONFIG_PATH) as f:
+                cfg = json.load(f)
+            for k, v in DEFAULT_CONFIG.items():
+                if k not in cfg:
+                    cfg[k] = v
+            for k, v in DEFAULT_CONFIG['cards'].items():
+                if k not in cfg.get('cards', {}):
+                    cfg.setdefault('cards', {})[k] = v
+            for k in [k for k in list(cfg) if k not in DEFAULT_CONFIG]:
+                del cfg[k]
+            _set_lang(cfg.get('language', 'auto'))
+            return cfg
+        except Exception:
+            pass
+    cfg = dict(DEFAULT_CONFIG)
+    cfg['cards'] = dict(DEFAULT_CONFIG['cards'])
+    _set_lang('auto')
+    return cfg
+
+def save_config(cfg):
+    os.makedirs(_CONFIG_DIR, exist_ok=True)
+    with open(CONFIG_PATH, 'w') as f:
+        json.dump(cfg, f, indent=2)

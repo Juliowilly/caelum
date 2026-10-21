@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#05071a"/>
+      <stop offset="0.65" stop-color="#1b2156"/>
+      <stop offset="1" stop-color="#7a3a52"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#f4efd8" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#f4efd8" stop-opacity="0"/>
+    </radialGradient>
+    <mask id="crescent">
+      <rect width="128" height="128" fill="#fff"/>
+      <circle cx="84" cy="38" r="21" fill="#000"/>
+    </mask>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="26" fill="url(#sky)"/>
+  <circle cx="72" cy="48" r="38" fill="url(#glow)"/>
+  <circle cx="72" cy="48" r="22" fill="#f5f0dc" mask="url(#crescent)"/>
+  <g fill="#ffffff">
+    <circle cx="30" cy="30" r="1.8"/>
+    <circle cx="44" cy="58" r="1.2"/>
+    <circle cx="100" cy="74" r="1.6"/>
+    <circle cx="26" cy="74" r="1.1"/>
+    <circle cx="104" cy="26" r="1.2"/>
+  </g>
+  <path d="M8 98 Q24 88 38 94 Q52 84 64 92 Q80 82 94 92 Q108 86 120 94 V94 Q120 120 94 120 H34 Q8 120 8 94 Z"
+        fill="#071108"/>
+</svg>

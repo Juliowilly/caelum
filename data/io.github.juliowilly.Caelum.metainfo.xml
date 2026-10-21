@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.juliowilly.Caelum</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Caelum</name>
+  <summary>Live sky overlay for your desktop</summary>
+  <description>
+    <p>
+      Caelum turns your desktop background into a live sky: the real position of the sun,
+      moon, planets and stars for your location, with clouds, rain and snow from live weather data.
+    </p>
+    <ul>
+      <li>240° panorama centred on your screen's real-world facing direction</li>
+      <li>Moon phase with correct crescent orientation for your latitude</li>
+      <li>Weekly and hourly forecast from Open-Meteo and MET Norway (no API key)</li>
+      <li>Compass support: hardware sensor, USB serial, or phone over the network</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">io.github.juliowilly.Caelum.desktop</launchable>
+  <url type="homepage">https://github.com/Juliowilly/caelum</url>
+  <developer id="io.github.juliowilly">
+    <name>Juliowilly</name>
+  </developer>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="1.0.0" date="2026-10-21"/>
+  </releases>
+</component>
