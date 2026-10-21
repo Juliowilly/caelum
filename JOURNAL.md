@@ -657,3 +657,18 @@ caelum/gtk_ui/    window.py  settings.py  clouds.py  autostart.py  app.py
 - **Uploaded to the Snap Store: revision 1 → `latest/beta`** (amd64), passed automated review in ~1 min.
   https://snapcraft.io/caelum. Store listing had no icon: added top-level `icon:` to snapcraft.yaml
   (ships with the next revision). Screenshots must be added on the web listing page.
+
+### Step 8 — store screenshots
+- Rendered off-screen at fixed UTC times with a scratch config (`clean_mode` off, all cards on, facing S)
+  and the real forecast; per-shot cloud cover and a neutral background for daytime (the overlay is
+  translucent, so over black a day sky looks muddy). Set in `data/screenshots/`: **sunset** (lead
+  image), **night**, **day**, **settings**, plus dusk. 1920×1080, 176–576 KB each. A rain scene was
+  dropped: at 88% cover it still read as blue sky with puffs.
+- Settings shot: the dialog's content moved into a `Gtk.OffscreenWindow` and captured with
+  `get_pixbuf()`. Off-screen the toplevel's themed background is transparent (labels looked clipped),
+  so it's filled with the panel colour sampled from inside the dialog.
+- metainfo lists sunset (default), night, day, settings (URLs pinned to the v1.1.0 tag).
+- **Bug fixed — cloud-cover badge overlap** (pre-existing): the badge used `_card` at 44 px, whose
+  subtitle baseline (`y+h-6` = y+38) sat on the value baseline (y+37), hiding "Lo"; temperature/wind ran
+  past the right edge. Own layout now: 210×50 at `W-224` (aligned with the forecast column, which starts
+  at y=74), temp/wind beside the percentage, Lo/Mid/Hi on its own row, icon 26 px on the right.

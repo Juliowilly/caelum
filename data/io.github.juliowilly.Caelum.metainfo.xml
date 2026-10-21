@@ -40,12 +40,20 @@
   </supports>
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.1.0/data/screenshots/night.png</image>
-      <caption>A clear night with constellations, planets, the Milky Way and the weekly forecast</caption>
+      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.1.0/data/screenshots/sunset.png</image>
+      <caption>Sunset over the horizon with sunlit clouds, the moon and planets, and the weekly forecast</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.1.0/data/screenshots/dusk.png</image>
-      <caption>Twilight with the waxing moon, Saturn and Mercury</caption>
+      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.1.0/data/screenshots/night.png</image>
+      <caption>A clear night with constellations, planets and the Milky Way</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.1.0/data/screenshots/day.png</image>
+      <caption>A partly cloudy morning sky over the desktop</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.1.0/data/screenshots/settings.png</image>
+      <caption>Settings: language, autostart, size, and which cards to show</caption>
     </screenshot>
   </screenshots>
   <releases>

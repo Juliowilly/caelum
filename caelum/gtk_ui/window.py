@@ -2053,19 +2053,47 @@ class SkyTracker(Gtk.Window):
             _wdirs = ['N','NNE','NE','ENE','E','ESE','SE','SSE',
                       'S','SSW','SW','WSW','W','WNW','NW','NNW']
             _wlbl  = _wdirs[int((clouds.get('wind_dir', 0) + 11.25) / 22.5) % 16]
-            extra  = ''
+            extra  = []
             if clouds.get('temp') is not None:
-                extra += f"  · {clouds['temp']:.0f}°C"
+                extra.append(f"{clouds['temp']:.0f}°C")
             if clouds.get('wind_speed', 0) > 0.5:
-                extra += f"  {_wlbl} {clouds['wind_speed']:.0f}m/s"
-            self._card(cr, W - 216, 18, 198, 44, _t('CLOUD COVER'),
-                       f"{clouds['total']}%",
-                       f"Lo {clouds['low']}%  Mid {clouds['mid']}%  Hi {clouds['high']}%{extra}")
+                extra.append(f"{_wlbl} {clouds['wind_speed']:.0f} m/s")
+            # Own layout instead of _card: _card's subtitle row assumes a taller card and
+            # overlapped the value here. Width/x match the weekly forecast column below (y=74).
+            bx, by, bw, bh = W - 224, 18, 210, 50
+            cr.save()
+            self._rrect(cr, bx, by, bw, bh, 9)
+            cr.set_source_rgba(0, 0, 0, 0.42)
+            cr.fill_preserve()
+            cr.set_source_rgba(1, 1, 1, 0.13)
+            cr.set_line_width(1)
+            cr.stroke()
+            cr.select_font_face('Sans', cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+            cr.set_font_size(9.5)
+            cr.set_source_rgba(0.75, 0.82, 1.0, 0.70)
+            cr.move_to(bx + 11, by + 15)
+            cr.show_text(_t('CLOUD COVER'))
+            value = f"{clouds['total']:.0f}%"
+            cr.set_font_size(15.5)
+            cr.set_source_rgba(1, 1, 1, 0.95)
+            cr.move_to(bx + 11, by + 33)
+            cr.show_text(value)
+            if extra:
+                vx = bx + 11 + cr.text_extents(value).x_advance + 8
+                cr.set_font_size(9.5)
+                cr.set_source_rgba(0.85, 0.90, 1.0, 0.75)
+                cr.move_to(vx, by + 33)
+                cr.show_text('  ·  '.join(extra))
+            cr.set_font_size(9)
+            cr.set_source_rgba(0.65, 0.78, 1.0, 0.60)
+            cr.move_to(bx + 11, by + bh - 6)
+            cr.show_text(f"Lo {clouds['low']:.0f}%  Mid {clouds['mid']:.0f}%  Hi {clouds['high']:.0f}%")
+            cr.restore()
             # Cloud cover weather icon
             wx_sym = clouds.get('symbol', '')
             if wx_sym:
                 cr.new_path()
-                self._draw_wx_icon(cr, W - 216 + 198 - 18, 18 + 22, 28, wx_sym)
+                self._draw_wx_icon(cr, bx + bw - 22, by + 22, 26, wx_sym)
 
         if enabled.get('clock'):
             emit(_t('LOCAL TIME'), now.strftime('%H:%M:%S'),
