@@ -597,7 +597,7 @@ caelum/gtk_ui/    window.py  settings.py  clouds.py  autostart.py  app.py
   constellation lines spanned the whole screen between them. Now returns None outside ±120°.
 - **Moon phase name was rounded down**: `int(phase*8)` called a 10.7-day moon "First Quarter".
   New `astronomy.phase_index()` rounds to the nearest of the 8 names (used by GTK and Kivy).
-- `tests/test_sky.py`: projection edges, out-of-view, below-horizon, phase naming (10 tests total).
+- `tests/test_sky.py`: projection edges, out-of-view, below-horizon, phase naming (8 tests total: 4 orientation + 4 sky).
 
 ### Metadata for the stores
 - Screenshots rendered off-screen by a scratch script (fixed UTC time, clear sky, real forecast):
@@ -627,3 +627,16 @@ caelum/gtk_ui/    window.py  settings.py  clouds.py  autostart.py  app.py
   signed with `-k <fingerprint>`.
 - Lintian: added a CC0-1.0 stanza for the metainfo file in debian/copyright (it was flagged as
   inconsistent with MIT). `binary-nmu-debian-revision-in-source` is a false positive of the PPA version format.
+- **PPA builds succeeded** (2026-10-21 ~20:25 UTC): noble 8m32s (Python 3.12), resolute 9m20s (Python 3.14);
+  the 8 unit tests ran and passed in both. Gotcha: `api.launchpad.net` served **stale** build status
+  ("Currently building") for ~20 min after both had finished; `launchpad.net/api/devel/...` was current.
+- Upload gotcha: dput's first attempt failed with a DNS error; re-running `dput` on the already-signed
+  `.changes` files worked (no rebuild needed).
+
+### Step 7 — snap via `snapcraft remote-build`
+- The first run froze in uninterruptible I/O (`wchan request_wait_answer` = FUSE): GSConnect's **stale
+  SFTP mount of the phone** (`sftp://192.168.1.90:1741/` under `/run/user/1000/gvfs`) hung everything that
+  enumerated mounts. Fixed with `gio mount -f -u sftp://192.168.1.90:1741/`. A frozen process with that
+  wchan points at this mount first.
+- The second run is stuck at "Trying to get project juliowilly-craft-remote-build", caught in the same
+  Launchpad API slowness (4–10 s per request).

@@ -30,9 +30,9 @@ A native desktop widget that turns your screen background into a live, photoreal
 
 | | |
 |---|---|
-| **Flathub** | `flatpak install flathub io.github.juliowilly.Caelum` |
-| **Snap Store** | `sudo snap install caelum` |
-| **Ubuntu PPA** | `sudo add-apt-repository ppa:juliowilly/caelum && sudo apt install caelum` |
+| **Ubuntu PPA** (24.04, 26.04) | `sudo add-apt-repository ppa:juliowilly/caelum && sudo apt install caelum` |
+| **Snap Store** *(coming soon)* | `sudo snap install caelum` |
+| **Flathub** *(coming soon)* | `flatpak install flathub io.github.juliowilly.Caelum` |
 | **.deb** | download from [Releases](https://github.com/Juliowilly/caelum/releases), then `sudo apt install ./caelum_*_all.deb` |
 
 Inside Flatpak and Snap the hardware compass sensors (IIO, USB serial) are not available; the
