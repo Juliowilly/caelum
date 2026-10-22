@@ -690,3 +690,19 @@ caelum/gtk_ui/    window.py  settings.py  clouds.py  autostart.py  app.py
   GTK_MODULES), then **promoted to stable**. `sudo snap install caelum` now works.
 - **GitHub release v1.1.1** with `caelum_1.1.1-1_all.deb` + `caelum_1.1.1_amd64.snap`; the downloaded
   assets' SHA-256 match the local builds.
+
+### Step 10 — Flathub ruled out; `.flatpak` bundle instead
+- Flathub-style build of a manifest pinned to `v1.1.1` (git source + commit) passed **all** linters
+  (manifest, builddir, repo), with screenshot mirroring done like Flathub's infra (`flathub-build` itself
+  can't run here because of rofiles-fuse, so its command was run by hand with `--disable-rofiles-fuse`
+  plus the `ostree commit … screenshots/x86_64` step). The flatpak builder sandbox can't see `/tmp`,
+  so builds must run from inside the home directory.
+- **Flathub's Generative AI policy blocks the planned submission**: AI agents must not open or automate
+  submission PRs or write PR descriptions, commit messages or reviewer replies; "Flathub manifests must
+  not contain AI-generated or AI-assisted content"; AI-generated code and packaging must be disclosed and
+  may be rejected. Caelum's code and packaging are largely AI-assisted, and the manifest was AI-written.
+  Not submitted. A Flathub submission would have to be the user's own work, with disclosure.
+- Instead: **`caelum-1.1.1.flatpak` single-file bundle** (3.5 MB, `--runtime-repo` = Flathub, so the
+  GNOME 51 runtime installs automatically), built from the v1.1.1 repo. Tested: installs, version 1.1.1,
+  runs. Added to the v1.1.1 GitHub release (checksum verified after download); release notes updated.
+  `make flatpak-bundle` added; README install table points at the bundle instead of Flathub.

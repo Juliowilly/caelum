@@ -32,7 +32,7 @@ A native desktop widget that turns your screen background into a live, photoreal
 |---|---|
 | **Ubuntu PPA** (24.04, 26.04) | `sudo add-apt-repository ppa:juliowilly/caelum && sudo apt install caelum` |
 | **Snap Store** | `sudo snap install caelum` |
-| **Flathub** *(coming soon)* | `flatpak install flathub io.github.juliowilly.Caelum` |
+| **Flatpak** (any distro) | download `caelum-<version>.flatpak` from [Releases](https://github.com/Juliowilly/caelum/releases), then `flatpak install --user caelum-<version>.flatpak` |
 | **.deb** | download from [Releases](https://github.com/Juliowilly/caelum/releases), then `sudo apt install ./caelum_*_all.deb` |
 
 Inside Flatpak and Snap the hardware compass sensors (IIO, USB serial) are not available; the
@@ -82,6 +82,7 @@ make test     # unit tests
 make deb      # → dist/caelum_<version>_all.deb   (debian/, needs devscripts dh-python pybuild-plugin-pyproject)
 make snap     # → caelum_<version>_amd64.snap     (snap/snapcraft.yaml, needs snapcraft + LXD)
 make flatpak  # builds and installs the Flatpak    (flatpak/…yml, needs org.flatpak.Builder + GNOME 51 SDK)
+make flatpak-bundle  # → dist/caelum-<version>.flatpak  (single file for GitHub Releases)
 make clean
 ```
 
@@ -99,7 +100,7 @@ tests/        python3 -m unittest discover -s tests
 data/         .desktop entry, icon, AppStream metainfo, store screenshots
 debian/       Debian source package (PPA + make deb)
 snap/         snapcraft.yaml
-flatpak/      Flatpak manifest (local build; the Flathub copy pins a git tag)
+flatpak/      Flatpak manifest (local builds and the release bundle)
 packaging/    build-deb.sh
 ```
 
