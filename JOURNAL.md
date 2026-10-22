@@ -683,3 +683,10 @@ caelum/gtk_ui/    window.py  settings.py  clouds.py  autostart.py  app.py
   snap revision 1 has the same app code.
 - The badge fix, store icon and screenshots came after those uploads, so everything is released as
   **1.1.1** (`caelum/__init__.py`, `debian/changelog` 1.1.1-1, metainfo release + screenshot URLs → v1.1.1).
+- `.deb` 1.1.1-1 built via debian/ (8 tests pass in the build).
+- PPA 1.1.1 sources signed and uploaded for noble + resolute (accepted 07:53 UTC, builds queued).
+- Snap 1.1.1 built locally in LXD (no NIC-attach problem this time); **revision 2 → beta**, user tested
+  it (only harmless GTK messages: atk-bridge is built in; appmenu-gtk-module comes from the host's
+  GTK_MODULES), then **promoted to stable**. `sudo snap install caelum` now works.
+- **GitHub release v1.1.1** with `caelum_1.1.1-1_all.deb` + `caelum_1.1.1_amd64.snap`; the downloaded
+  assets' SHA-256 match the local builds.
