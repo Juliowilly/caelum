@@ -1,3 +1,11 @@
+caelum (1.1.1-1) unstable; urgency=medium
+
+  * New upstream release 1.1.1.
+    - Cloud-cover badge no longer hides the "Lo" value or overflows its card.
+    - Snap Store listing icon; store screenshots.
+
+ -- Juliowilly <jw.adamagaba@gmail.com>  Thu, 22 Oct 2026 07:50:36 +0000
+
 caelum (1.1.0-1) unstable; urgency=medium
 
   * New upstream release 1.1.0.

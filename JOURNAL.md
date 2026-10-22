@@ -677,3 +677,9 @@ caelum/gtk_ui/    window.py  settings.py  clouds.py  autostart.py  app.py
   clean mode (no cards/compass/labels, facing 230°), cropped to the y=240–880 band, with icon,
   "Caelum" (Ubuntu Sans Light) and the tagline "The real sky, live on your desktop" right-aligned,
   110 px from the edges.
+
+### Step 9 — release 1.1.1 on every channel
+- Tagged **v1.1.0 at `aeb08e4`**, the commit embedded in the PPA orig tarball (`git get-tar-commit-id`);
+  snap revision 1 has the same app code.
+- The badge fix, store icon and screenshots came after those uploads, so everything is released as
+  **1.1.1** (`caelum/__init__.py`, `debian/changelog` 1.1.1-1, metainfo release + screenshot URLs → v1.1.1).
