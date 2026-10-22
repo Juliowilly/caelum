@@ -706,3 +706,5 @@ caelum/gtk_ui/    window.py  settings.py  clouds.py  autostart.py  app.py
   GNOME 51 runtime installs automatically), built from the v1.1.1 repo. Tested: installs, version 1.1.1,
   runs. Added to the v1.1.1 GitHub release (checksum verified after download); release notes updated.
   `make flatpak-bundle` added; README install table points at the bundle instead of Flathub.
+- **PPA 1.1.1 built**: noble 2m46s, resolute 3m04s, both "Successfully built". All channels are now on
+  1.1.1: PPA, Snap Store stable (rev 2), GitHub release (.deb, .snap, .flatpak).
