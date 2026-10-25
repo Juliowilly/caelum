@@ -32,7 +32,7 @@ from ..core.sky import (
 from ..core.weather import (
     _NO_CLOUDS, _WX_ACCENT, _WX_LABEL, fetch_met_norway, fetch_open_meteo, merge_weather,
 )
-from ..core import observed
+from ..core import observed, snapstore
 from ..core.net import coord, get_json
 from .clouds import (
     _soft_puff, draw_altocumulus, draw_cirrus, draw_cumulus, draw_deck, draw_mid_sheet,
@@ -103,6 +103,7 @@ class SkyTracker(Gtk.Window):
         self._meteors  = []
         self._storm    = wx.Storm()
         self._update   = None    # version of a newer snap revision installed while running
+        self._waiting  = None    # version of a newer snap waiting in the store (installs on close)
         # Cloud layers' scroll offsets (screen widths); start where the wind left them
         self._drift   = {layer: time.time() / 600.0 * 0.618 % 4.0 for layer in _CLOUD_DRIFT}
         self._drift_t = time.monotonic()
@@ -122,6 +123,9 @@ class SkyTracker(Gtk.Window):
         GLib.timeout_add(100,              self._tick)
         GLib.timeout_add_seconds(5,        self._watch_weather)
         GLib.timeout_add_seconds(60,       self._check_update)
+        if sandbox.snap_identity():
+            GLib.timeout_add_seconds(90, lambda: self._check_store() and False)
+            GLib.timeout_add_seconds(6 * 3600, self._check_store)
         GLib.timeout_add_seconds(60,       self._export_lockscreen_bg)
         try:
             Gio.NetworkMonitor.get_default().connect('network-changed', self._on_network_changed)
@@ -329,6 +333,24 @@ class SkyTracker(Gtk.Window):
             self._update = update
             self.da.queue_draw()
         return True
+
+    def _check_store(self):
+        """
+        Every 6 h (snap only): is a newer Caelum waiting in the store? snapd won't install it while
+        Caelum runs, and Caelum runs all session, so say so.
+        """
+        ident = sandbox.snap_identity()
+        def work():
+            version = snapstore.check(*ident)
+            GLib.idle_add(self._set_waiting, version)
+        threading.Thread(target=work, daemon=True).start()
+        return True
+
+    def _set_waiting(self, version):
+        if version != self._waiting:
+            self._waiting = version
+            self.da.queue_draw()
+        return False
 
     def _on_resume(self):
         """Back from sleep: refetch everything now and refresh the exported wallpaper."""
@@ -764,6 +786,9 @@ class SkyTracker(Gtk.Window):
         elif self._update is not None and not self._exporting:
             self._draw_hint(cr, gx - 30, gy, _t('Caelum {v} is installed · restart Caelum to use it').format(
                 v=self._update) if self._update else _t('Caelum was updated · restart it to use the new version'))
+        elif self._waiting and not self._exporting:
+            self._draw_hint(cr, gx - 30, gy, _t('Caelum {v} is ready · it installs when Caelum closes '
+                                               '(Ctrl+Q, or when you log out)').format(v=self._waiting))
         self._update_input_region(W, H)
 
         # ── Constellation hover label

@@ -40,6 +40,11 @@ Inside Flatpak and Snap the hardware compass sensors (IIO, USB serial) are not a
 the direction your screen faces in Settings instead. Wallpaper export and autostart use the
 desktop portals under Flatpak.
 
+**Snap updates**: snapd won't update a snap while it runs, and Caelum runs all session, so an
+update installs when Caelum closes (Ctrl+Q, or when you log out). Caelum shows a note when one is
+waiting; it asks the Snap Store every 6 hours, sending nothing about you. `snap refresh caelum`
+while Caelum runs fails with "has running apps": quit Caelum first.
+
 Each release on GitHub has a `SHA256SUMS` file: download it next to the package and run
 `sha256sum -c --ignore-missing SHA256SUMS` to check the download.
 
@@ -169,7 +174,9 @@ rounded to 2 decimals (about 1 km), never more precise; RainViewer only learns w
 tile you are in. Nothing else about you is sent, and Caelum
 collects no statistics. A photo you turn into a landscape never leaves your computer: Caelum reads
 only the file you pick (through the system file picker), refuses non-JPEG/PNG and oversized files,
-and saves the landscape without the photo's metadata (place, camera, date).
+and saves the landscape without the photo's metadata (place, camera, date). The snap also asks
+the Snap Store (which snapd already uses) whether an update is waiting; that request carries no
+location or personal data.
 
 ## License
 

@@ -17,11 +17,11 @@ def coord(v):
     return f'{round(v, 2) + 0.0:.2f}'   # + 0.0 turns -0.0 into 0.0
 
 
-def get_bytes(url, timeout=10):
+def get_bytes(url, timeout=10, headers=None):
     """GET url (HTTPS only) and return the body. Raises on any failure."""
     if not url.startswith('https://'):
         raise ValueError(f'refusing a plain-HTTP request: {url}')
-    req = urllib.request.Request(url, headers={'User-Agent': USER_AGENT})
+    req = urllib.request.Request(url, headers=dict(headers or {}, **{'User-Agent': USER_AGENT}))
     with urllib.request.urlopen(req, timeout=timeout) as r:
         body = r.read(_MAX_BYTES + 1)
     if len(body) > _MAX_BYTES:
@@ -29,6 +29,6 @@ def get_bytes(url, timeout=10):
     return body
 
 
-def get_json(url, timeout=10):
+def get_json(url, timeout=10, headers=None):
     """GET url (HTTPS only) and parse the JSON reply. Raises on any failure."""
-    return json.loads(get_bytes(url, timeout))
+    return json.loads(get_bytes(url, timeout, headers))

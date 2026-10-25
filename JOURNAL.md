@@ -1479,3 +1479,26 @@ The user asked to release 1.5.4: "Your own photo" landscapes and the location pr
 bump in `__init__`, debian/changelog, metainfo (screenshots pinned to v1.5.4, not re-rendered: the
 default views are unchanged). The privacy grep (now in the release routine) found only public
 places, star positions and formula constants.
+
+### Snap: say when an update is waiting (unreleased)
+
+The user still got "cannot refresh: has running apps" and asked for a global fix ("Think Global").
+snapd 2.77 holds automatic refreshes while the app runs: it downloads ahead, installs as soon as
+the app's processes exit (logout, Ctrl+Q), and forces the update after 14 days. Only a manual
+`snap refresh` fails. The Store allows `refresh-mode` only for daemons, and the sandbox can't
+relaunch Caelum, so the fix is to tell the user.
+- `caelum/core/snapstore.py`: `GET https://api.snapcraft.io/v2/snaps/info/<name>?fields=version,revision`
+  with `Snap-Device-Series: 16`, the public endpoint snapd uses. `waiting()` compares the channel
+  map with our revision (same architecture, `latest` track).
+  - A snap can't see its tracked channel, so it is taken as the least risky channel at or past our
+    revision. A stable user is never pointed at a beta; a beta user whose revision is also stable
+    gets no notice, which is the accepted trade-off.
+- `sandbox.snap_identity()`: (name, revision, arch) from the snap env; None for `--dangerous`
+  builds (revision x1) and outside a snap. `net.get_bytes/get_json` take extra headers.
+- Window: checks 90 s after start, then every 6 h (snap only, in a thread). The note reads
+  "Caelum {v} is ready · it installs when Caelum closes (Ctrl+Q, or when you log out)"; the
+  "installed · restart" note takes priority. fr/es/de/pt/it.
+- Live: revision 11 → no notice (stable = 11); revision 9 → "1.5.3". Note checked in en/de at 960 px.
+- README: snap updates and privacy (the request carries no location or personal data).
+- Tests: tests/test_snapstore.py (channel choice, architecture/track, garbage, request,
+  identity). 92 pass.

@@ -24,6 +24,14 @@ def kind():
     return None
 
 
+def snap_identity():
+    """Inside a store snap: (name, revision, architecture); None elsewhere or for a local build."""
+    name, rev, arch = (os.environ.get(k, '') for k in ('SNAP_NAME', 'SNAP_REVISION', 'SNAP_ARCH'))
+    if kind() != 'snap' or not name or not rev.isdigit() or not arch:
+        return None                 # a local `snap install --dangerous` has revision x1, x2…
+    return name, int(rev), arch
+
+
 def installed_update():
     """
     Inside a snap: the version of a newer revision that snapd installed while this one kept
