@@ -1586,3 +1586,8 @@ Releases; (3) built on GitHub Actions. This session: step 1, on the `windows` br
   layered bit was the likely cause: GTK on Windows may paint through UpdateLayeredWindow, so that
   bit is GTK's. Kept now (and logged); the 24H2 path adds it only when GTK hasn't. A probe 10 s in
   logs which window is at the screen centre and the sky's parent chain.
+- Fourth run: **click-through off works** (full-screen sky over the icons, under the runner's
+  terminal). Behind the icons still nothing: the log showed GTK's window is layered
+  (UpdateLayeredWindow), which 24H2's Progman doesn't draw. On Windows, app.py now sets
+  `GDK_WIN32_LAYERED=0` before GTK starts, so the sky paints normally and the 24H2 path makes it
+  layered with plain alpha 255. The probe found only the runner's terminal at the centre: removed.

@@ -2,6 +2,12 @@
 
 import argparse
 import os
+import sys
+
+if sys.platform == 'win32':
+    # GTK would paint through UpdateLayeredWindow, which Windows doesn't show behind the desktop
+    # icons (win32.py); read when GDK opens the display
+    os.environ.setdefault('GDK_WIN32_LAYERED', '0')
 
 import gi
 gi.require_version('Gtk', '3.0')

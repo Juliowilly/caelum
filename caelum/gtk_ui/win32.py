@@ -133,7 +133,8 @@ def place_sky(hwnd, behind_icons):
     x, y, _w, _h = _primary_rect()
     flags = _SWP_NOSIZE | _SWP_NOACTIVATE | _SWP_SHOWWINDOW | _SWP_FRAMECHANGED
     ex = user32.GetWindowLongPtrW(hwnd, _GWL_EXSTYLE)
-    # GTK may paint through a layered window (UpdateLayeredWindow): that bit is GTK's, keep it
+    # GTK paints through a layered window (UpdateLayeredWindow) unless GDK_WIN32_LAYERED=0 (app.py)
+    # turned that off; the bit is GTK's then, keep it
     gtk_layered = bool(ex & _WS_EX_LAYERED)
     # Never in the taskbar or Alt+Tab, and a click doesn't raise it over the user's windows
     ex = (ex | _WS_EX_TOOLWINDOW | _WS_EX_NOACTIVATE) & ~_WS_EX_APPWINDOW
@@ -170,28 +171,6 @@ def _log(hwnd, where):
     print(f'Caelum: sky placed {where}, {r.right - r.left}x{r.bottom - r.top} at '
           f'({r.left}, {r.top}), visible={bool(user32.IsWindowVisible(hwnd))}',
           file=sys.stderr, flush=True)
-
-
-def _class_name(hwnd):
-    buf = ctypes.create_unicode_buffer(64)
-    user32.GetClassNameW(hwnd, buf, len(buf))
-    return buf.value or '?'
-
-
-def probe(hwnd):
-    """Log which window shows at the screen's centre, and the sky's parents: for bug reports."""
-    x, y, w, h = _primary_rect()
-    user32.WindowFromPoint.restype = wintypes.HWND
-    user32.WindowFromPoint.argtypes = [wintypes.POINT]
-    user32.GetParent.restype = wintypes.HWND
-    user32.GetParent.argtypes = [wintypes.HWND]
-    top = user32.WindowFromPoint(wintypes.POINT(x + w // 2, y + h // 2))
-    chain, p = [], user32.GetParent(hwnd)
-    while p:
-        chain.append(_class_name(p))
-        p = user32.GetParent(p)
-    print(f'Caelum: at the screen centre: {_class_name(top)} (sky: {top == hwnd}); '
-          f"sky's parents: {' > '.join(chain) or 'none'}", file=sys.stderr, flush=True)
 
 
 def restore_desktop():
