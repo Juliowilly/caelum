@@ -313,6 +313,8 @@ class SkyTracker(Gtk.Window):
         self._behind_icons = behind
         alloc = self.da.get_allocation()
         print(f'Caelum: GTK draws {alloc.width}x{alloc.height}', file=sys.stderr, flush=True)
+        hwnd = self._win32.hwnd_of(self.get_window())
+        GLib.timeout_add_seconds(10, lambda: self._win32.probe(hwnd) and False)
 
     def _leave_desktop(self):
         """On exit: take the sky off the icon layer so the user's wallpaper shows again."""

@@ -1582,3 +1582,7 @@ Releases; (3) built on GitHub Actions. This session: step 1, on the `windows` br
   Now GTK gets the screen size (set_default_size) before the first show and the Win32 call only
   moves the window. On 24H2 the sky child is layered (opaque), since 24H2's Progman is composited
   and draws only layered children. The log also gives GTK's own drawing size.
+- Third run: GTK's size was right (1024×768) but no sky showed in either mode. Clearing the
+  layered bit was the likely cause: GTK on Windows may paint through UpdateLayeredWindow, so that
+  bit is GTK's. Kept now (and logged); the 24H2 path adds it only when GTK hasn't. A probe 10 s in
+  logs which window is at the screen centre and the sky's parent chain.
