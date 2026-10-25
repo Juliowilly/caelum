@@ -1507,3 +1507,5 @@ relaunch Caelum, so the fix is to tell the user.
 
 The user asked to release 1.5.5: the snap's "update waiting" note. Version bump in `__init__`,
 debian/changelog, metainfo (screenshots pinned to v1.5.5, not re-rendered). Privacy grep clean.
+- The user tested beta ("beta works"). Snap rev 13 (1.5.5) promoted to stable; stable users go
+  from 1.5.3 to 1.5.5 with the photo landscapes, the location fix and the update note.
