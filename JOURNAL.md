@@ -1614,3 +1614,20 @@ it. The gear was under the taskbar and couldn't be clicked: the sky covers the w
 sky stays full-screen, but the gear, compass and forecast column now keep out of the taskbar's
 edge (monitor rect minus work area, any side, re-read every 5 s since the taskbar can move or
 auto-hide, scaled to GTK pixels).
+- The user's report from their Windows PC (Windows only there; this laptop stays on Ubuntu):
+  1. Settings opened from the tray, but none of its options reacted to clicks.
+  2. Clicking the compass did nothing (behind the icons, every click goes to the desktop).
+- Fixes:
+  - Settings on Windows is a normal window: not owned by the sky (a child of the desktop, so its
+    owned windows got no input), and with the system title bar instead of GTK's header bar; the
+    tabs sit above the pages.
+  - A **hit layer**: an invisible window (layered, alpha 1) just over the icons whose region is
+    the controls' rectangles (gear, compass, forecast cards; the whole screen while exploring).
+    Clicks there reach Caelum; everywhere else they reach the icons, as the input shape does on
+    Linux. Its clicks and motion go to the sky's handlers.
+  - The bottom-most window now goes just above the window that holds the icons (Progman on 24H2,
+    a WorkerW before), not just above Progman.
+- The taskbar log showed the right edges (48 px at the bottom), but the gear in the screenshot sat
+  where a 749 px frame puts it: the sky may stop repainting after placement. The CI script
+  (`packaging/windows/ci-check.ps1`) now takes two screenshots 5 s apart and clicks the compass
+  (checks `facing` in config.json), the gear (checks Settings opens) and a Settings tab.

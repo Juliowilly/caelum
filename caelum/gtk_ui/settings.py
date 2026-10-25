@@ -162,18 +162,31 @@ class SettingsDialog(Gtk.Window):
         self.par = parent
         self.cfg = parent.cfg
         self.set_default_size(440, 640)
-        self.set_transient_for(parent)
-        self.set_destroy_with_parent(True)
+        if sys.platform != 'win32':
+            # On Windows the sky is a child of the desktop: a dialog it owned would get no input
+            self.set_transient_for(parent)
+            self.set_destroy_with_parent(True)
 
         stack = Gtk.Stack()
         stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
-        header = Gtk.HeaderBar()
-        header.set_show_close_button(True)
         switcher = Gtk.StackSwitcher()
         switcher.set_stack(stack)
-        header.set_custom_title(switcher)
-        self.set_titlebar(header)
-        self.add(stack)
+        if sys.platform == 'win32':
+            # GTK's own title bar (client-side decorations) misbehaves on Windows: keep the
+            # system one and put the tabs above the pages
+            self.set_icon_list(Gtk.Window.get_default_icon_list())
+            switcher.set_halign(Gtk.Align.CENTER)
+            switcher.set_margin_top(8)
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+            box.pack_start(switcher, False, False, 0)
+            box.pack_start(stack, True, True, 0)
+            self.add(box)
+        else:
+            header = Gtk.HeaderBar()
+            header.set_show_close_button(True)
+            header.set_custom_title(switcher)
+            self.set_titlebar(header)
+            self.add(stack)
 
         for name, title, build in (('sky',      _t('Sky'),      self._build_sky),
                                    ('display',  _t('Display'),  self._build_display),

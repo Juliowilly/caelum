@@ -296,7 +296,9 @@ class SkyTracker(Gtk.Window):
         self._win32        = win32
         self._placed_for   = None    # click_through value the window was placed for
         self._behind_icons = False
+        self._win_scale    = 1.0     # Windows pixels per GTK pixel
         self._tray         = self._make_tray()
+        self._hit          = self._make_hit_layer()
         GLib.timeout_add_seconds(5, self._update_insets)   # the taskbar can move or auto-hide
         # GTK paints at the size it asked for: ask for the whole screen before the first show
         self.set_default_size(*win32.primary_size())
@@ -313,6 +315,12 @@ class SkyTracker(Gtk.Window):
         if self._behind_icons and not behind:
             self._win32.restore_desktop()
         self._behind_icons = behind
+        if behind:
+            self._hit.show_all()
+            self._win32.place_hit_layer(self._win32.hwnd_of(self._hit.get_window()))
+        else:
+            self._hit.hide()
+        self._input_rects = ()   # stale: set the click region again at the next draw
         alloc = self.da.get_allocation()
         print(f'Caelum: GTK draws {alloc.width}x{alloc.height}', file=sys.stderr, flush=True)
         self._update_insets()
@@ -326,6 +334,7 @@ class SkyTracker(Gtk.Window):
             return True
         width = self.da.get_allocation().width
         k = width / screen_w if width > 1 and screen_w else 1.0   # Windows pixels → GTK pixels
+        self._win_scale = 1.0 / k
         insets = tuple(int(round(e * k)) for e in edges)
         if insets != self._insets:
             print(f'Caelum: taskbar edges {edges} (screen {screen_w} px) → {insets} in GTK pixels',
@@ -340,6 +349,19 @@ class SkyTracker(Gtk.Window):
             self.hide()
             self._win32.restore_desktop()
             self._behind_icons = False
+
+    def _make_hit_layer(self):
+        """Takes the clicks on the gear, compass and cards while the sky is behind the icons."""
+        hit = Gtk.Window()
+        hit.set_decorated(False)
+        hit.set_skip_taskbar_hint(True)
+        hit.set_app_paintable(True)
+        hit.set_default_size(*self._win32.primary_size())
+        hit.add_events(Gdk.EventMask.BUTTON_PRESS_MASK | Gdk.EventMask.POINTER_MOTION_MASK)
+        hit.connect('button-press-event', self._on_click)
+        hit.connect('motion-notify-event', self._on_motion)
+        hit.connect('draw', lambda _w, _cr: True)   # nothing to draw: it is (nearly) invisible
+        return hit
 
     def _make_tray(self):
         tray  = Gtk.StatusIcon()
@@ -704,6 +726,12 @@ class SkyTracker(Gtk.Window):
         if rects == self._input_rects:
             return
         self._input_rects = rects
+        if self._win32:
+            # Behind the icons the sky gets no clicks: the hit layer takes them on the controls
+            if self._behind_icons:
+                self._win32.set_hit_region(self._win32.hwnd_of(self._hit.get_window()), rects,
+                                           self._win_scale)
+            return
         if rects is None:
             self.input_shape_combine_region(None)
         else:

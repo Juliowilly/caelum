@@ -1,6 +1,6 @@
 # Windows test build: GTK3 + PyGObject from MSYS2, bundled by PyInstaller into a zip.
-# Each run checks the bundle (--selftest), starts Caelum behind and in front of
-# the desktop icons and keeps a screenshot of each.
+# Each run checks the bundle (--selftest), then starts Caelum behind and in front of the desktop
+# icons and clicks its controls (packaging/windows/ci-check.ps1); screenshots are kept.
 name: Windows build
 
 on:
@@ -47,28 +47,10 @@ jobs:
           cat selftest.txt
           exit ${status:-0}
 
-      # Behind the icons (the default), then in front of them (click-through off)
-      - name: Start Caelum and take screenshots
+      # Behind the icons (the default) and in front of them: screenshots and real clicks
+      - name: Start Caelum and click its controls
         shell: pwsh
-        run: |
-          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
-          $cfgDir = "$env:APPDATA\caelum"
-          New-Item -ItemType Directory -Force $cfgDir | Out-Null
-          foreach ($mode in 'behind-icons', 'click-through-off') {
-            $ct = if ($mode -eq 'behind-icons') { 'true' } else { 'false' }
-            Set-Content "$cfgDir\config.json" "{`"click_through`": $ct}"
-            $p = Start-Process -FilePath dist\caelum\caelum.exe -PassThru
-            Start-Sleep -Seconds 30
-            $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
-            $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
-            [System.Drawing.Graphics]::FromImage($bmp).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
-            $bmp.Save("$PWD\screenshot-$mode.png")
-            $log = "$env:LOCALAPPDATA\caelum\caelum.log"
-            if (Test-Path $log) { Copy-Item $log "caelum-$mode.log"; Get-Content $log }
-            if ($p.HasExited) { throw "Caelum exited after start (code $($p.ExitCode))" }
-            Stop-Process -Id $p.Id
-            Start-Sleep -Seconds 3
-          }
+        run: packaging/windows/ci-check.ps1
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -82,5 +64,4 @@ jobs:
           name: checks
           path: |
             selftest.txt
-            screenshot-*.png
-            caelum-*.log
+            checks/

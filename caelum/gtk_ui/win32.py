@@ -17,6 +17,7 @@ import winreg
 from ctypes import wintypes
 
 user32 = ctypes.WinDLL('user32', use_last_error=True)
+gdi32 = ctypes.WinDLL('gdi32')
 
 _GWL_STYLE, _GWL_EXSTYLE = -16, -20
 _WS_CHILD, _WS_POPUP = 0x40000000, 0x80000000
@@ -25,6 +26,7 @@ _WS_EX_LAYERED, _LWA_ALPHA = 0x80000, 0x2
 _SWP_NOSIZE, _SWP_NOZORDER = 0x1, 0x4
 _SWP_NOACTIVATE, _SWP_SHOWWINDOW, _SWP_FRAMECHANGED = 0x10, 0x40, 0x20
 _HWND_BOTTOM = 1
+_RGN_OR = 2
 _GW_HWNDPREV = 3
 _SMTO_NORMAL = 0
 _SPI_GETDESKWALLPAPER, _SPI_SETDESKWALLPAPER = 0x73, 0x14
@@ -52,6 +54,10 @@ user32.MonitorFromPoint.restype = wintypes.HMONITOR
 user32.MonitorFromPoint.argtypes = [wintypes.POINT, wintypes.DWORD]
 user32.SetLayeredWindowAttributes.argtypes = [wintypes.HWND, wintypes.COLORREF, wintypes.BYTE,
                                               wintypes.DWORD]
+user32.SetWindowRgn.argtypes = [wintypes.HWND, wintypes.HRGN, wintypes.BOOL]
+gdi32.CreateRectRgn.restype = wintypes.HRGN
+gdi32.CombineRgn.argtypes = [wintypes.HRGN, wintypes.HRGN, wintypes.HRGN, ctypes.c_int]
+gdi32.DeleteObject.argtypes = [wintypes.HGDIOBJ]
 user32.GetWindow.restype = wintypes.HWND
 user32.GetWindow.argtypes = [wintypes.HWND, wintypes.UINT]
 user32.SystemParametersInfoW.argtypes = [wintypes.UINT, wintypes.UINT, ctypes.c_void_p, wintypes.UINT]
@@ -177,14 +183,65 @@ def place_sky(hwnd, behind_icons):
         return True
     user32.SetParent(hwnd, None)
     user32.SetWindowLongPtrW(hwnd, _GWL_STYLE, (style | _WS_POPUP) & ~_WS_CHILD)
-    # Just above the desktop (Progman, a full-screen window of its own), not under it
+    _just_above_icons(hwnd, x, y, flags)
+    _log(hwnd, 'bottom-most window' + ('' if not behind_icons else ' (no icon layer found)'))
+    return False
+
+
+def _icons_top():
+    """The top-level window that holds the desktop icons: Progman on 24H2+, a WorkerW before."""
     progman = user32.FindWindowW('Progman', None)
-    above = user32.GetWindow(progman, _GW_HWNDPREV) if progman else None
+    if progman and user32.FindWindowExW(progman, None, 'SHELLDLL_DefView', None):
+        return progman
+    found = []
+
+    def _probe(hwnd, _lparam):
+        if user32.FindWindowExW(hwnd, None, 'SHELLDLL_DefView', None):
+            found.append(hwnd)
+            return False
+        return True
+    user32.EnumWindows(_ENUM_PROC(_probe), 0)
+    return found[0] if found else progman
+
+
+def _just_above_icons(hwnd, x, y, flags):
+    """Bottom of the normal windows, yet over the desktop and its icons (full-screen windows
+    themselves): a plain HWND_BOTTOM window goes under them and is never seen."""
+    icons = _icons_top()
+    above = user32.GetWindow(icons, _GW_HWNDPREV) if icons else None
     if above == hwnd:
         flags |= _SWP_NOZORDER
     user32.SetWindowPos(hwnd, above or _HWND_BOTTOM, x, y, 0, 0, flags)
-    _log(hwnd, 'bottom-most window' + ('' if not behind_icons else ' (no icon layer found)'))
-    return False
+
+
+# ─── Clicks on the sky's controls while it is behind the icons ──────────────
+
+def place_hit_layer(hwnd):
+    """
+    An invisible window over the icons that takes the clicks the sky's controls need (gear,
+    compass, forecast cards; see set_hit_region): at alpha 1 nothing shows, yet Windows still
+    sends it the clicks. Clicks elsewhere go to the icons, as on Linux with the input shape.
+    """
+    ex = user32.GetWindowLongPtrW(hwnd, _GWL_EXSTYLE)
+    ex = (ex | _WS_EX_TOOLWINDOW | _WS_EX_NOACTIVATE | _WS_EX_LAYERED) & ~_WS_EX_APPWINDOW
+    user32.SetWindowLongPtrW(hwnd, _GWL_EXSTYLE, ex)
+    user32.SetLayeredWindowAttributes(hwnd, 0, 1, _LWA_ALPHA)
+    x, y, _w, _h = _primary_rect()
+    _just_above_icons(hwnd, x, y, _SWP_NOSIZE | _SWP_NOACTIVATE | _SWP_SHOWWINDOW)
+
+
+def set_hit_region(hwnd, rects, scale=1.0):
+    """The hit layer takes clicks only inside rects ((x, y, w, h), GTK pixels × scale = Windows
+    pixels); None: everywhere (exploring the sky)."""
+    if rects is None:
+        user32.SetWindowRgn(hwnd, None, True)
+        return
+    rgn = gdi32.CreateRectRgn(0, 0, 0, 0)
+    for x, y, w, h in rects:
+        part = gdi32.CreateRectRgn(*(int(round(v * scale)) for v in (x, y, x + w, y + h)))
+        gdi32.CombineRgn(rgn, rgn, part, _RGN_OR)
+        gdi32.DeleteObject(part)
+    user32.SetWindowRgn(hwnd, rgn, True)     # Windows owns rgn from here
 
 
 def _log(hwnd, where):
