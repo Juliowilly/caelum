@@ -1,6 +1,7 @@
 # CI check of the Windows build, on the runner's desktop: start Caelum behind the icons and in
-# front of them, take screenshots, and click its controls as a user would (compass, gear, a tab
-# of Settings). Screenshots and logs go to checks\. Fails if a click had no effect.
+# front of them (each with GTK's layered painting off and on), take screenshots, and click its
+# controls as a user would (compass, gear, a tab of Settings). Screenshots and logs go to
+# checks\. Fails if a click had no effect.
 param([string]$Exe = 'dist\caelum\caelum.exe')
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms, System.Drawing
@@ -35,8 +36,12 @@ function Shot($name) {
 $cfgDir = "$env:APPDATA\caelum"
 New-Item -ItemType Directory -Force $cfgDir | Out-Null
 $failed = @()
-foreach ($mode in 'behind-icons', 'click-through-off') {
-    $ct = if ($mode -eq 'behind-icons') { 'true' } else { 'false' }
+# GDK_WIN32_LAYERED: Caelum sets 0 unless the environment has it; 1 tries GTK's layered painting
+$runs = foreach ($l in '0', '1') { foreach ($m in 'behind-icons', 'click-through-off') { ,@($m, $l) } }
+foreach ($run in $runs) {
+    $place, $env:GDK_WIN32_LAYERED = $run
+    $mode = "$place-layered$($env:GDK_WIN32_LAYERED)"
+    $ct = if ($place -eq 'behind-icons') { 'true' } else { 'false' }
     Set-Content "$cfgDir\config.json" "{`"click_through`": $ct, `"facing`": 180.0}"
     $p = Start-Process -FilePath $Exe -PassThru
     Start-Sleep -Seconds 25

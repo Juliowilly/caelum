@@ -1631,3 +1631,9 @@ auto-hide, scaled to GTK pixels).
   where a 749 px frame puts it: the sky may stop repainting after placement. The CI script
   (`packaging/windows/ci-check.ps1`) now takes two screenshots 5 s apart and clicks the compass
   (checks `facing` in config.json), the gear (checks Settings opens) and a Settings tab.
+- Click-test run: every click failed (compass, gear; both modes) and the two screenshots 5 s apart
+  were identical: the sky doesn't repaint after placement, which also explains Settings "not
+  working" (switches change but nothing redraws). Suspect: GTK paints with UpdateLayeredWindow
+  once it sees WS_EX_LAYERED, which fails after our SetLayeredWindowAttributes. Caelum now logs
+  frames drawn per 10 s and each click; the CI runs both modes with GTK's layered painting off
+  and on (GDK_WIN32_LAYERED=0/1).

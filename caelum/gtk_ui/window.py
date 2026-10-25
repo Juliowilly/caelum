@@ -300,6 +300,8 @@ class SkyTracker(Gtk.Window):
         self._tray         = self._make_tray()
         self._hit          = self._make_hit_layer()
         GLib.timeout_add_seconds(5, self._update_insets)   # the taskbar can move or auto-hide
+        self._frames = 0
+        GLib.timeout_add_seconds(10, self._log_frames)
         # GTK paints at the size it asked for: ask for the whole screen before the first show
         self.set_default_size(*win32.primary_size())
         atexit.register(self._leave_desktop)
@@ -349,6 +351,12 @@ class SkyTracker(Gtk.Window):
             self.hide()
             self._win32.restore_desktop()
             self._behind_icons = False
+
+    def _log_frames(self):
+        """For bug reports: whether the sky still repaints (it should, ~10 frames a second)."""
+        print(f'Caelum: {self._frames} frames drawn in 10 s', file=sys.stderr, flush=True)
+        self._frames = 0
+        return True
 
     def _make_hit_layer(self):
         """Takes the clicks on the gear, compass and cards while the sky is behind the icons."""
@@ -628,6 +636,8 @@ class SkyTracker(Gtk.Window):
         self.da.queue_draw()
 
     def _on_click(self, _w, ev):
+        if self._win32:
+            print(f'Caelum: click at ({ev.x:.0f}, {ev.y:.0f})', file=sys.stderr, flush=True)
         if math.hypot(ev.x - self._gear_cx, ev.y - self._gear_cy) <= 20:
             self._open_settings()
             return True
@@ -764,6 +774,8 @@ class SkyTracker(Gtk.Window):
     # ── Draw dispatch ────────────────────────────────────────────────────────
 
     def _on_draw(self, _w, cr):
+        if self._win32:
+            self._frames += 1
         cfg   = self.cfg
         alloc = self.da.get_allocation()
         W, H  = alloc.width, alloc.height
