@@ -40,23 +40,35 @@
   </supports>
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.3.1/data/screenshots/sunset.png</image>
-      <caption>Sunset over the horizon with sunlit clouds, the moon and planets, and the weekly forecast</caption>
+      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.4.0/data/screenshots/sunset.png</image>
+      <caption>Sunset over a tree-lined plain with sunlit clouds, the moon and planets, and the weekly forecast</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.3.1/data/screenshots/night.png</image>
+      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.4.0/data/screenshots/night.png</image>
       <caption>A clear night with constellations, planets and the Milky Way</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.3.1/data/screenshots/day.png</image>
+      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.4.0/data/screenshots/day.png</image>
       <caption>A partly cloudy morning sky over the desktop</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.3.1/data/screenshots/settings.png</image>
-      <caption>Settings: language, autostart, size, and which cards to show</caption>
+      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.4.0/data/screenshots/settings.png</image>
+      <caption>Settings: the Sky tab, with the opaque sky and the choice of landscape</caption>
     </screenshot>
   </screenshots>
   <releases>
+    <release version="1.4.0" date="2026-10-25">
+      <description>
+        <p>Real landscapes along the horizon.</p>
+        <ul>
+          <li>The dark band at the bottom is replaced by a photographed landscape: a green plain with trees, mountains or the sea</li>
+          <li>It turns with the direction you face and is relit by the sun and moon, from full daylight to golden hour, twilight and moonlit night</li>
+          <li>The sun, moon and clouds set behind the trees and mountains</li>
+          <li>Choose it in Settings, Sky tab: the photos, the old drawn hills, or nothing</li>
+          <li>The photos are CC0 panoramas from Poly Haven</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.3.1" date="2026-10-25">
       <description>
         <p>Easier to find your way around the settings.</p>

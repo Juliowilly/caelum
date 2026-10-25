@@ -38,11 +38,16 @@ class Landscape:
         pix  = GdkPixbuf.Pixbuf.new_from_file(os.path.join(_DIR, name + '.jpg'))
         mask = cairo.ImageSurface.create_from_png(os.path.join(_DIR, name + '-mask.png'))
         self.w, self.h = pix.get_width(), pix.get_height()
-        # Photo with the sky cut out, premultiplied, ready to sample
-        self.surf = cairo.ImageSurface(cairo.FORMAT_ARGB32, self.w, self.h + _PAD)
+        # The photo (opaque) and its sky cut-out are kept apart: the cut-out is applied after
+        # relighting, so the soft edges get darkened as much as the rest
+        self.surf = cairo.ImageSurface(cairo.FORMAT_RGB24, self.w, self.h + _PAD)
         cr = cairo.Context(self.surf)
         Gdk.cairo_set_source_pixbuf(cr, pix, 0, _PAD)
-        cr.mask_surface(mask, 0, _PAD)
+        cr.paint()
+        self.mask = cairo.ImageSurface(cairo.FORMAT_ARGB32, self.w, self.h + _PAD)
+        cr = cairo.Context(self.mask)
+        cr.set_source_surface(mask, 0, _PAD)
+        cr.paint()
 
     def render(self, W, H, facing, light, sat):
         """
@@ -59,27 +64,27 @@ class Landscape:
         u0  = self.w * self.south + (az0 - 180.0) * px_per_deg
         kv  = self.h / (self.top + self.bottom) * 90.0 / (_YH * H)
         v0  = self.h / (self.top + self.bottom) * (self.top - _HORIZON * 90.0 / _YH) + kv * y_top + _PAD
-        pat = cairo.SurfacePattern(self.surf)
-        pat.set_matrix(cairo.Matrix(k, 0, 0, kv, u0 % self.w, v0))
-        pat.set_extend(cairo.Extend.REPEAT)
-        pat.set_filter(cairo.Filter.GOOD)
-        cr.set_source(pat)
+        matrix = cairo.Matrix(k, 0, 0, kv, u0 % self.w, v0)
+
+        def pattern(surf):
+            pat = cairo.SurfacePattern(surf)
+            pat.set_matrix(matrix)
+            pat.set_extend(cairo.Extend.REPEAT)
+            pat.set_filter(cairo.Filter.GOOD)
+            return pat
+        cr.set_source(pattern(self.surf))
         cr.paint()
-        if sat < 0.99 or light != (1.0, 1.0, 1.0):
-            base = out.create_similar_image(cairo.FORMAT_ARGB32, out.get_width(), out.get_height())
-            bc = cairo.Context(base)
-            bc.set_source_surface(out)
-            bc.paint()
-            # Night vision: fade the colours (only where there is ground)
-            if sat < 0.99:
-                cr.push_group()
-                cr.set_source_surface(base)
-                cr.paint_with_alpha(1.0 - sat)
-                fade = cr.pop_group()
-                cr.set_operator(cairo.Operator.HSL_SATURATION)
-                cr.set_source_rgb(0.5, 0.5, 0.5)
-                cr.mask(fade)
+        # Night vision: fade the colours
+        if sat < 0.99:
+            cr.set_operator(cairo.Operator.HSL_SATURATION)
+            cr.set_source_rgb(0.5, 0.5, 0.5)
+            cr.paint_with_alpha(1.0 - sat)
+        if light != (1.0, 1.0, 1.0):
             cr.set_operator(cairo.Operator.MULTIPLY)
             cr.set_source_rgb(*light)
-            cr.mask_surface(base)
+            cr.paint()
+        # Cut the sky out
+        cr.set_operator(cairo.Operator.DEST_IN)
+        cr.set_source(pattern(self.mask))
+        cr.paint()
         return out, y_top

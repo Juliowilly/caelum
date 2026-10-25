@@ -1009,7 +1009,7 @@ thick low cloud: 80% cirrus alone left the sun at ~33% and greyed the sky with t
   switch updates `cfg`, saves once and redraws; the tab is remembered across reopen. 26 tests pass,
   pyflakes clean. `data/screenshots/settings.png` is still the old dialog; update it at the next release.
 
-### Photo landscapes along the horizon (unreleased)
+### Photo landscapes along the horizon (released in 1.4.0)
 - **Request**: replace the dark horizon band with a green plain with a few trees. Also offer mountains
   and the sea, using real images rather than drawings.
 - **Source**: Poly Haven 360° panoramas, **CC0**, so they are fine for Debian/PPA, snap and flatpak.
@@ -1032,7 +1032,8 @@ thick low cloud: 80% cirrus alone left the sun at ~33% and greyed the sky with t
     to the sky colour; at the defaults the central massif lost its top half.
   - `top` = tallest feature + 2° (38°/30°/28°). Output: `<name>.jpg` (q82), `<name>-mask.png`
     (opacity in the alpha channel, which is how cairo reads it), `landscapes.json`. ~2 MB in total.
-- **`gtk_ui/landscape.py`**: the photo and mask become one premultiplied ARGB surface. `render()` maps
+- **`gtk_ui/landscape.py`** (as first written; the relight was later reworked, see Release 1.4.0): the
+  photo and mask become one premultiplied ARGB surface. `render()` maps
   screen → photo with a single cairo pattern matrix. Columns follow azimuth through `sky_to_screen`'s
   constants, wrapping the panorama with `Extend.REPEAT`. Rows follow elevation. `south` is the panorama
   column facing south. Then relighting: HSL_SATURATION towards grey (night vision) and MULTIPLY by the
@@ -1065,3 +1066,19 @@ thick low cloud: 80% cirrus alone left the sun at ~33% and greyed the sky with t
 - Version bump: `__init__.py`, `debian/changelog` 1.3.1-1, metainfo release notes, screenshots pinned
   to `v1.3.1`. `settings.png` is now the new dialog (Sky tab, captured from this code) over
   `night.png`, the same composition as before.
+
+### Release 1.4.0 (2026-10-25)
+- Photo landscapes, on master after the 1.3.1 merge.
+- **Night-time rim fix found while making the screenshots**: the moonlit night showed pale outlines
+  around the tree canopies and the holes in the leaves. Cause: the relight was MULTIPLY masked by the
+  photo's alpha, so a half-transparent edge pixel got only half the darkening and stayed brighter
+  than both the dark ground and the night sky.
+  - Darkening the edge colours in the generator (min-filter near the cut) did not remove the rim, and
+    it left blotchy dark edges in daylight. Reverted.
+  - Fix in `gtk_ui/landscape.py`: the photo stays opaque (RGB24) and the cut-out is a separate
+    surface. `render()` paints the photo, desaturates and multiplies with plain paints, then applies the
+    cut-out last with DEST_IN through the same pattern matrix. Edges are now darkened exactly like the
+    rest; the day render is unchanged. Re-render cost 53 ms (was 62).
+- New screenshots: day, sunset and night with the plain landscape. `settings.png` is the Sky tab
+  with the Landscape row, over the new night shot. Metainfo captions updated, URLs pinned to `v1.4.0`.
+- Version bump: `__init__.py`, `debian/changelog` 1.4.0-1, metainfo release notes.
