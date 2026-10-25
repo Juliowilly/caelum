@@ -1502,3 +1502,8 @@ relaunch Caelum, so the fix is to tell the user.
 - README: snap updates and privacy (the request carries no location or personal data).
 - Tests: tests/test_snapstore.py (channel choice, architecture/track, garbage, request,
   identity). 92 pass.
+
+### Release 1.5.5 (2026-10-25)
+
+The user asked to release 1.5.5: the snap's "update waiting" note. Version bump in `__init__`,
+debian/changelog, metainfo (screenshots pinned to v1.5.5, not re-rendered). Privacy grep clean.
