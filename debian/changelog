@@ -1,3 +1,14 @@
+caelum (1.5.1-1) unstable; urgency=medium
+
+  * New upstream release 1.5.1.
+    - Weather now from observations: rain from radar (MET Norway Nowcast,
+      RainViewer) or the nearest airport's METAR; clouds, temperature,
+      humidity and wind from the nearest airport or MET Nowcast; forecasts
+      as the fallback. Settings shows the source of each.
+    - Snap: refreshes while running, with a restart note in the app.
+
+ -- Juliowilly <jw.adamagaba@gmail.com>  Sun, 25 Oct 2026 13:54:12 +0000
+
 caelum (1.5.0-1) unstable; urgency=medium
 
   * New upstream release 1.5.0.

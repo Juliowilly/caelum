@@ -1332,3 +1332,11 @@ comes from the best observation that covers the place, with the forecasts as the
     burst of requests. The window retries every 10 min.
 - Tests: observe() order and fallbacks, wind units, freezing temperatures, the sky rules, merge
   of sky and air. 75 pass.
+
+### Release 1.5.1 (2026-10-25)
+
+The user asked to release 1.5.1. It brings the snap refresh fix and the observed weather (rain,
+clouds, temperature, humidity and wind). The user's running copy was still snap rev 6 (1.4.0):
+the 1.5.0 refresh had been refused because the app was running.
+- Version bump: `__init__`, debian/changelog, metainfo `<release>` and screenshots pinned to
+  v1.5.1. The screenshots were not re-rendered: only Settings changed.
