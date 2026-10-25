@@ -869,3 +869,13 @@ thick low cloud: 80% cirrus alone left the sun at ~33% and greyed the sky with t
   (all cards on, facing S, Lomé, cover 55 % Lo35/Mid40/Hi25 at 10:00 and 45 % Lo25/Mid35/Hi20 at
   17:35) and the live MET/Open-Meteo forecast, dated 2026-10-25 so the forecast weekdays match.
   `night.png` (0 % cover) and `settings.png` are unaffected and kept. `dusk.png` stays unused.
+- **Builds**: `.deb` 1.2.0-1 (8 tests pass in the build). Snap: the first `snapcraft pack` reused
+  stale part state and produced **`caelum_1.1.1_amd64.snap`** although the tree was 1.2.0; after
+  `snapcraft clean caelum` it packed `caelum_1.2.0_amd64.snap` (checked `meta/snap.yaml` and
+  `caelum/__init__.py` inside). The shell lacked the `lxd` group (socket "permission denied") though
+  the user is a member: `sg lxd -c "snapcraft pack"`. No veth/IPv4 trouble this time.
+  Flatpak bundle `caelum-1.2.0.flatpak` (207 KB; 1.1.1's 3.5 MB came from the Flathub-style build
+  with mirrored screenshots), installed over the user's 1.1.1 test install: runs 1.2.0.
+- **GitHub release v1.2.0** with the .deb, .snap and .flatpak; downloaded assets' SHA-256 match.
+- **PPA**: 1.2.0 sources signed and uploaded for noble + resolute; accepted, builds started.
+- **Snap Store**: revision 3 → beta; user tested it → **promoted to stable**.
