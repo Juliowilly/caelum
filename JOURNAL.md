@@ -1701,3 +1701,7 @@ auto-hide, scaled to GTK pixels).
   - Adaptive frame rate behind the icons: the next frame waits 3× the last render time (at least
     100 ms), so rendering takes at most a third of the main thread. The log gives ms per frame.
   - CI: with Settings open, Progman and Shell_TrayWnd must answer a WM_NULL within 2 s.
+- CI passed, including the new check (Progman and the taskbar answer with Settings open). Behind
+  the icons the runner renders 71–82 ms per frame at 1024×768, so the canvas shows ~3.5 frames/s
+  there; a 1920×1080 screen will be nearer 1.5 frames/s. Making rendering cheaper (e.g. caching the
+  static layers) is a follow-up.
