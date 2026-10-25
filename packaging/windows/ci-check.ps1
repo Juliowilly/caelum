@@ -60,7 +60,7 @@ foreach ($mode in 'behind-icons', 'click-through-off') {
     [Desk]::Click($work.Right - 28, $work.Bottom - 28)
     Start-Sleep -Seconds 4
     Shot "$mode-gear"
-    $dlg = [Desk]::FindWindow($null, $settingsTitle)
+    $dlg = [Desk]::FindWindow([NullString]::Value, $settingsTitle)   # $null would pass ""
     if ($dlg -eq [IntPtr]::Zero) {
         $failed += "${mode}: gear click opened no Settings"
     } else {

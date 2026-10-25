@@ -29,7 +29,7 @@ _SWP_NOSIZE, _SWP_NOZORDER = 0x1, 0x4
 _SWP_NOACTIVATE, _SWP_SHOWWINDOW, _SWP_FRAMECHANGED = 0x10, 0x40, 0x20
 _HWND_BOTTOM = 1
 _RGN_OR = 2
-_GW_HWNDPREV = 3
+_GW_HWNDNEXT, _GW_HWNDPREV = 2, 3
 _SMTO_NORMAL = 0
 _SPI_GETDESKWALLPAPER, _SPI_SETDESKWALLPAPER = 0x73, 0x14
 _SPIF_UPDATEINIFILE, _SPIF_SENDCHANGE = 0x1, 0x2
@@ -221,6 +221,7 @@ class DesktopCanvas:
 
     def __init__(self):
         self._frame = None
+        self._blit_error = False
         self._proc = _WNDPROC(self._wndproc)    # keep a reference: Windows calls it
         hinst = _kernel32.GetModuleHandleW(None)
         wc = _WNDCLASSEXW(cbSize=ctypes.sizeof(_WNDCLASSEXW), lpfnWndProc=self._proc,
@@ -251,7 +252,23 @@ class DesktopCanvas:
         user32.SetWindowPos(self.hwnd, below or _HWND_BOTTOM, x, y, w, h,
                             _SWP_NOACTIVATE | _SWP_SHOWWINDOW | _SWP_FRAMECHANGED)
         _log(self.hwnd, 'behind the icons (24H2 Progman)' if below else 'behind the icons (WorkerW)')
+        self._log_neighbours()
         return True
+
+    def _log_neighbours(self):
+        """For bug reports: the canvas's styles and the windows just above and below it."""
+        names = []
+        for rel in (_GW_HWNDPREV, _GW_HWNDNEXT):
+            other = user32.GetWindow(self.hwnd, rel)
+            buf = ctypes.create_unicode_buffer(64)
+            if other:
+                user32.GetClassNameW(other, buf, len(buf))
+            names.append(buf.value or 'none')
+        ex = user32.GetWindowLongPtrW(self.hwnd, _GWL_EXSTYLE)
+        style = user32.GetWindowLongPtrW(self.hwnd, _GWL_STYLE)
+        print(f'Caelum: desktop canvas: above it {names[0]}, below it {names[1]}; '
+              f'style {style & 0xFFFFFFFF:#010x}, exstyle {ex & 0xFFFFFFFF:#010x}',
+              file=sys.stderr, flush=True)
 
     def show(self, pixels, w, h, stride):
         """Show a frame: Cairo ARGB32 pixels (a buffer of h rows of `stride` bytes)."""
@@ -272,7 +289,11 @@ class DesktopCanvas:
         data, w, h, stride = self._frame
         bmi = _BITMAPINFOHEADER(biSize=ctypes.sizeof(_BITMAPINFOHEADER), biWidth=stride // 4,
                                 biHeight=-h, biPlanes=1, biBitCount=32)   # top-down, BI_RGB
-        gdi32.SetDIBitsToDevice(hdc, 0, 0, w, h, 0, 0, 0, h, data, ctypes.byref(bmi), 0)
+        lines = gdi32.SetDIBitsToDevice(hdc, 0, 0, w, h, 0, 0, 0, h, data, ctypes.byref(bmi), 0)
+        if lines != h and not self._blit_error:
+            self._blit_error = True      # once: the log would fill up 10 times a second
+            print(f'Caelum: desktop canvas: SetDIBitsToDevice copied {lines} of {h} rows '
+                  f'(hdc {hdc}, error {ctypes.get_last_error()})', file=sys.stderr, flush=True)
 
     def _wndproc(self, hwnd, msg, wparam, lparam):
         try:
