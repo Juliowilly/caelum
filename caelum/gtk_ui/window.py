@@ -853,7 +853,12 @@ class SkyTracker(Gtk.Window):
         # ── Gear button is always drawn first (visible even when app is off)
         il, it, ir, ib = self._insets
         gx, gy = W - 28 - ir, H - 28 - ib
-        self._cmp_cx, self._cmp_cy = 62 + il, 95 + it
+        if self._win32:
+            # Windows keeps desktop icons in the top-left corner: the compass goes bottom left,
+            # its "click to set facing" line still above the taskbar
+            self._cmp_cx, self._cmp_cy = 62 + il, H - ib - (self._cmp_r + 32)
+        else:
+            self._cmp_cx, self._cmp_cy = 62 + il, 95 + it
         self._gear_cx, self._gear_cy = gx, gy
         app_on = cfg.get('app_enabled', True)
 

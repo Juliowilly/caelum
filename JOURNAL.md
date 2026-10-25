@@ -1682,3 +1682,6 @@ auto-hide, scaled to GTK pixels).
   (view turned east), the gear (Settings opens) and the Display tab. Click-through off too.
 - Noticed: the compass (top left) sits under the first column of desktop icons on Windows, and
   its click area covers part of them. To decide with the user.
+- The user chose to move the compass on Windows: it is now bottom left (centre 62 px in,
+  r + 32 px above the taskbar's edge), clear of the desktop icons' column. Linux unchanged. The
+  CI clicks it there.

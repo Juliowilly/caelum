@@ -66,8 +66,9 @@ foreach ($mode in 'behind-icons', 'click-through-off') {
     Write-Output "${mode}: the sky changed $([int]($covered * 100)) % of the desktop"
     if ($covered -lt 0.6) { $failed += "${mode}: sky not visible ($([int]($covered * 100)) % changed)" }
 
-    # Compass (centre 62, 95 inside the work area): a click to the right of the centre faces east
-    [Desk]::Click($work.Left + 62 + 30, $work.Top + 95)
+    # Compass (bottom left: centre 62 in, 78 up from the work area's corner): a click to the
+    # right of the centre faces east
+    [Desk]::Click($work.Left + 62 + 30, $work.Bottom - 78)
     Start-Sleep -Seconds 2
     $facing = (Get-Content "$cfgDir\config.json" | ConvertFrom-Json).facing
     if ([math]::Abs($facing - 90) -gt 1) { $failed += "${mode}: compass click (facing $facing)" }
