@@ -1689,3 +1689,5 @@ auto-hide, scaled to GTK pixels).
   keeps that GTK window at 1024×749, but the taskbar margins came from the monitor (768 high), so
   the compass sat 19 px higher. Margins are now measured from the window's own rectangle in that
   mode (the desktop canvas is full-screen, so the monitor's are right there).
+- Next run passed every check in both modes; the compass sits bottom left, below the icon column
+  and above the taskbar, and turned east on the click.
