@@ -1392,3 +1392,6 @@ The user asked to release 1.5.2: the wallpaper switch (every minute) and the Abo
 - Version bump: `__init__`, debian/changelog (it also corrects 1.5.1's claim that the snap refreshes
   while running), metainfo `<release>`, screenshots pinned to v1.5.2. The screenshots were not
   re-rendered: only Settings changed.
+- PPA: `ppa-upload.sh` refused to run because of four untracked photos in the folder (the user's
+  IMG_20261025_*.jpg, left untouched). The source is `git archive HEAD`, so the clean-tree check now
+  ignores untracked files.

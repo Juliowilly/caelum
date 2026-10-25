@@ -20,7 +20,8 @@ REV="${1:-1}"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-if [ -n "$(git status --porcelain)" ]; then
+# Untracked files (e.g. photos dropped in the folder) never reach the archive of HEAD
+if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
     echo "Commit your changes first: the PPA is built from HEAD." >&2
     exit 1
 fi
