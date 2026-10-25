@@ -40,23 +40,35 @@
   </supports>
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.3.0/data/screenshots/sunset.png</image>
+      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.3.1/data/screenshots/sunset.png</image>
       <caption>Sunset over the horizon with sunlit clouds, the moon and planets, and the weekly forecast</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.3.0/data/screenshots/night.png</image>
+      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.3.1/data/screenshots/night.png</image>
       <caption>A clear night with constellations, planets and the Milky Way</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.3.0/data/screenshots/day.png</image>
+      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.3.1/data/screenshots/day.png</image>
       <caption>A partly cloudy morning sky over the desktop</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.3.0/data/screenshots/settings.png</image>
+      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.3.1/data/screenshots/settings.png</image>
       <caption>Settings: language, autostart, size, and which cards to show</caption>
     </screenshot>
   </screenshots>
   <releases>
+    <release version="1.3.1" date="2026-10-25">
+      <description>
+        <p>Easier to find your way around the settings.</p>
+        <ul>
+          <li>Settings are organised in four tabs: Sky, Display, Location and System</li>
+          <li>Options are grouped under headings, and the less obvious ones have a short explanation</li>
+          <li>The settings window reopens on the tab you used last</li>
+          <li>Italian translations for the features added in 1.3.0</li>
+          <li>New settings screenshot</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.3.0" date="2026-10-25">
       <description>
         <p>A sky that no longer depends on your wallpaper, and a desktop you can use while it runs.</p>

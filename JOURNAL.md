@@ -1008,3 +1008,12 @@ thick low cloud: 80% cirrus alone left the sun at ~33% and greyed the sky with t
 - **Verified**: screenshots of all four tabs in English and French. Programmatic check: the Opaque Sky
   switch updates `cfg`, saves once and redraws; the tab is remembered across reopen. 26 tests pass,
   pyflakes clean. `data/screenshots/settings.png` is still the old dialog; update it at the next release.
+
+### Release 1.3.1 (2026-10-25)
+- The user asked to release every version in turn: 1.3.0 (snap promoted to stable, rev 4), then 1.3.1
+  (Settings redesign only), then 1.4.0 (landscapes).
+- 1.3.1 is built from branch `release-1.3.1` at `017cb4a` (the Settings commit). Master already had the
+  landscapes on top. The branch is merged back into master afterwards.
+- Version bump: `__init__.py`, `debian/changelog` 1.3.1-1, metainfo release notes, screenshots pinned
+  to `v1.3.1`. `settings.png` is now the new dialog (Sky tab, captured from this code) over
+  `night.png`, the same composition as before.
