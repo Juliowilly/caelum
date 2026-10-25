@@ -27,7 +27,7 @@ def kind():
 def installed_update():
     """
     Inside a snap: the version of a newer revision that snapd installed while this one kept
-    running (snapcraft.yaml `refresh-mode: ignore-running`), '' if its version can't be read,
+    running (a refresh forced after snapd's 14-day hold), '' if its version can't be read,
     or None when this is the current revision (or not a snap).
     """
     name, rev = os.environ.get('SNAP_NAME'), os.environ.get('SNAP_REVISION')

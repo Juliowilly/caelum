@@ -1340,3 +1340,13 @@ clouds, temperature, humidity and wind). The user's running copy was still snap 
 the 1.5.0 refresh had been refused because the app was running.
 - Version bump: `__init__`, debian/changelog, metainfo `<release>` and screenshots pinned to
   v1.5.1. The screenshots were not re-rendered: only Settings changed.
+- **Snap Store upload rejected**: `refresh-mode is not allowed` for a non-daemon app. The Store
+  only accepts the key for services, so the 9b500ae fix was wrong (it had only been checked with a
+  local build).
+  - Removed. snapd 2.77 holds automatic updates until Caelum quits, sends a notification, and
+    forces the update after 14 days. A manual `snap refresh caelum` still refuses while Caelum
+    runs: quit it first.
+  - The "restart to use it" note stays for forced updates.
+  - Only the snap was rebuilt (still 1.5.1, from the commit after the v1.5.1 tag). The GitHub
+    .snap and SHA256SUMS were replaced. The .deb, flatpak and PPA packages don't contain
+    snapcraft.yaml.

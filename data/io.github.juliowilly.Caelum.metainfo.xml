@@ -67,7 +67,7 @@
         <ul>
           <li>Rain, clouds, temperature, humidity and wind come from the most accurate free observation covering your location: weather radar, then the nearest airport's reports, with the forecast as the fallback</li>
           <li>Settings → Location shows where each one comes from</li>
-          <li>The snap updates while Caelum runs, and Caelum tells you to restart it to use the new version</li>
+          <li>When the snap is updated while Caelum runs, Caelum tells you to restart it to use the new version</li>
         </ul>
       </description>
     </release>
