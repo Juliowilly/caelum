@@ -942,3 +942,25 @@ thick low cloud: 80% cirrus alone left the sun at ~33% and greyed the sky with t
   whole window, day selected → idle → 9 rects. Explore + empty-sky click → 9 rects. Hint rendered and
   checked. 21 tests pass, pyflakes clean. Note: in a live run a real pointer moving over the window
   keeps explore mode on, which is the intended behaviour.
+
+### Opaque sky option (unreleased)
+- **Why**: the sky overlay is translucent: 6–20 % alpha by day, 50–72 % at night. The wallpaper
+  therefore sets most of the daytime look. Renders over six wallpapers showed no static wallpaper works all
+  day: black → black noon; bright blue → blue night; white → washed out. Dark navy is the best compromise
+  but gives a dim noon. The wallpaper/lock-screen export rendered over black, so its noon was black too.
+- **`core/sky.py` `opaque_sky(el, clouds, m_bright)`** → (zenith, horizon, ground top, ground bottom).
+  - Keyframes by sun elevation (`_OPAQUE_SKY`, −18° … 50°): near-black night; violet/rose twilight
+    horizon; warm horizon at ±2°; blue day zenith with a hazy pale horizon.
+  - Clouds grey it out by `0.95·opaque_cover²`: blue sky stays between scattered clouds, and a closed
+    deck turns grey as bright as the daylight.
+  - Moonlight lifts the night a little.
+  - Ground below the horizon (0.72 H) is a darkened, greener version of the horizon colour.
+- **`_draw_sky`** paints that gradient fully opaque under the usual translucent tint when
+  `opaque_sky` is on (new switch "Opaque Sky", default off, fr/es/de/pt). The tint, horizon effects,
+  stars, clouds and silhouette are unchanged on top.
+- **Export** (`_render_frame_to_surface`) always uses it (`_exporting` flag) instead of painting black
+  first, so the exported wallpaper/lock screen now has a proper daytime sky.
+- **Verified**: 5 new tests (brightens monotonically with the sun; clear day blue with paler
+  horizon; night near-black; overcast day grey; full moon lifts the night). 26 tests pass, pyflakes clean.
+  Rendered 8 scenes (noon clear/30 %/overcast, golden hour, sunset, dusk, night, night 60 %) over a
+  white wallpaper: none of it shows through.

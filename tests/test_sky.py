@@ -3,7 +3,7 @@ import unittest
 from caelum.core.astronomy import phase_index
 from caelum.core.sky import (
     low_clouds, plane_to_sky,
-    band_slots, cloud_layers, mid_sheet, naked_eye_visibility, opaque_cover, overcast_deck, set_facing, sky_to_screen, veil_transmission,
+    band_slots, cloud_layers, mid_sheet, naked_eye_visibility, opaque_cover, opaque_sky, overcast_deck, set_facing, sky_to_screen, veil_transmission,
 )
 
 W, H = 1000, 500
@@ -116,6 +116,44 @@ class PlanetVisibilityTest(unittest.TestCase):
         self.assertEqual(naked_eye_visibility(0.7, 0.0), 0.0)
         self.assertEqual(naked_eye_visibility(-2.2, -3.5), 1.0)
         self.assertEqual(naked_eye_visibility(0.7, -8.0), 1.0)
+
+
+class OpaqueSkyTest(unittest.TestCase):
+    CLEAR = dict(total=0, low=0, mid=0, high=0)
+    OVERCAST = dict(total=100, low=100, mid=0, high=0)
+
+    @staticmethod
+    def lum(c):
+        return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+
+    def test_brightens_with_the_sun(self):
+        prev = -1
+        for el in (-18, -12, -6, -2, 2, 8, 20, 60):
+            zen = opaque_sky(el, self.CLEAR, 0.0)[0]
+            self.assertGreater(self.lum(zen), prev, el)
+            prev = self.lum(zen)
+
+    def test_clear_day_is_blue_with_paler_horizon(self):
+        zen, hor, g_top, g_bot = opaque_sky(45, self.CLEAR, 0.0)
+        self.assertGreater(zen[2], zen[0] * 2)
+        self.assertGreater(self.lum(hor), self.lum(zen))
+        self.assertLess(self.lum(g_top), self.lum(hor))
+        self.assertLess(self.lum(g_bot), self.lum(g_top))
+
+    def test_night_is_near_black(self):
+        for c in opaque_sky(-30, self.CLEAR, 0.0):
+            self.assertLess(max(c), 0.06)
+
+    def test_overcast_day_is_grey(self):
+        zen = opaque_sky(45, self.OVERCAST, 0.0)[0]
+        self.assertLess(max(zen) - min(zen), 0.15)
+        self.assertGreater(self.lum(zen), 0.4)
+
+    def test_full_moon_lifts_the_night(self):
+        dark = opaque_sky(-30, self.CLEAR, 0.0)[0]
+        moon = opaque_sky(-30, self.CLEAR, 1.0)[0]
+        self.assertGreater(self.lum(moon), self.lum(dark))
+        self.assertLess(max(moon), 0.12)
 
 
 if __name__ == '__main__':

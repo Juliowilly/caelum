@@ -26,8 +26,9 @@ from ..core.catalog import _CONSTELLATIONS
 from ..core.config import DEFAULT_CONFIG, load_config, save_config
 from ..core.i18n import _PHASE_NAMES, _day_name, _fmt_date, _t
 from ..core.sky import (
-    _clamp, _cloud_palette, _seg_dist, cloud_layers, get_facing,
-    mid_sheet, moon_brightness, naked_eye_visibility, overcast_deck, set_facing, sky_color_adaptive, sky_to_screen,
+    _clamp, _cloud_palette, _lerp, _seg_dist, cloud_layers, get_facing,
+    mid_sheet, moon_brightness, naked_eye_visibility, opaque_sky, overcast_deck, set_facing,
+    sky_color_adaptive, sky_to_screen,
     veil_transmission,
 )
 from ..core.weather import (
@@ -82,6 +83,7 @@ class SkyTracker(Gtk.Window):
         self._weekly_card_rects  = []     # [(date_str, x, y, w, h), ...]
         self._input_rects        = ()     # input region last applied (see _update_input_region)
         self._explore_until      = 0.0    # monotonic deadline of explore mode (whole sky takes input)
+        self._exporting          = False  # rendering the wallpaper/lock-screen image
         self._city_name          = None   # reverse-geocoded city name
         self._moon_limb_angle    = 0.0    # stored each frame for use in info card icon
         self._today_str          = datetime.date.today().isoformat()
@@ -735,6 +737,17 @@ class SkyTracker(Gtk.Window):
 
     def _draw_sky(self, cr, W, H, sun_el, sun_az, clouds, m_bright, star_vis=1.0,
                   lat=6.14, lon=1.21, utc=None):
+        if self.cfg.get('opaque_sky', False) or self._exporting:
+            # Paint the whole sky so the wallpaper doesn't show (the exported image always does)
+            zen, hor, g_top, g_bot = opaque_sky(sun_el, clouds, m_bright)
+            base = cairo.LinearGradient(0, 0, 0, H)
+            base.add_color_stop_rgb(0.0,  *zen)
+            base.add_color_stop_rgb(0.40, *_lerp(zen, hor, 0.30))
+            base.add_color_stop_rgb(0.72, *hor)
+            base.add_color_stop_rgb(0.72, *g_top)
+            base.add_color_stop_rgb(1.0,  *g_bot)
+            cr.set_source(base)
+            cr.paint()
         r, g, b, a = sky_color_adaptive(sun_el, clouds, m_bright)
         grad = cairo.LinearGradient(0, 0, 0, H)
         # At night keep the bottom dark too — prevents bright wallpaper bleeding through
@@ -1106,10 +1119,12 @@ class SkyTracker(Gtk.Window):
             return None
         surf = cairo.ImageSurface(cairo.FORMAT_ARGB32, W, H)
         cr   = cairo.Context(surf)
-        # Black background so the sky renders correctly as a wallpaper
-        cr.set_source_rgb(0.0, 0.0, 0.0)
-        cr.paint()
-        self._on_draw(self.da, cr)
+        # Opaque sky: a wallpaper can't show another wallpaper through it
+        self._exporting = True
+        try:
+            self._on_draw(self.da, cr)
+        finally:
+            self._exporting = False
         return surf
 
     def _export_lockscreen_bg(self):

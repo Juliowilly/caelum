@@ -36,6 +36,7 @@ DEFAULT_CONFIG = {
     },
     "clean_mode": False,
     "click_through": True,
+    "opaque_sky": False,
     "keep_above": False,
     "sticky": True,
     "show_constellations": True,

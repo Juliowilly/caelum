@@ -207,6 +207,20 @@ class SettingsDialog(Gtk.Window):
         row.pack_end(sw_c, False, False, 0)
         box.pack_start(row, False, False, 2)
 
+        row_os = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        l_os   = Gtk.Label(label=_t('Opaque Sky'), xalign=0)
+        l_os.set_hexpand(True)
+        l_os.set_tooltip_text('Paint the whole sky (bright blue by day, black at night) '
+                              'instead of tinting the wallpaper behind it.')
+        sw_os = Gtk.Switch()
+        sw_os.set_active(self.cfg.get('opaque_sky', False))
+        sw_os.connect('notify::active', lambda s, p: (
+            self.cfg.update({'opaque_sky': s.get_active()}),
+            save_config(self.cfg), self.par.da.queue_draw()))
+        row_os.pack_start(l_os, True, True, 0)
+        row_os.pack_end(sw_os, False, False, 0)
+        box.pack_start(row_os, False, False, 2)
+
         row_ct = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         l_ct   = Gtk.Label(label=_t('Click Through to Desktop'), xalign=0)
         l_ct.set_hexpand(True)
