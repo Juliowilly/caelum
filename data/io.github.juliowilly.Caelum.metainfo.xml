@@ -40,27 +40,38 @@
   </supports>
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.5.1/data/screenshots/sunset.png</image>
+      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.5.2/data/screenshots/sunset.png</image>
       <caption>Sunset over a tree-lined plain with sunlit clouds, the moon and planets, and the weekly forecast</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.5.1/data/screenshots/night.png</image>
+      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.5.2/data/screenshots/night.png</image>
       <caption>A clear night with constellations, planets and the Milky Way</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.5.1/data/screenshots/rain.png</image>
+      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.5.2/data/screenshots/rain.png</image>
       <caption>Rain over the mountains: the distance fades into the downpour</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.5.1/data/screenshots/day.png</image>
+      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.5.2/data/screenshots/day.png</image>
       <caption>A partly cloudy morning sky over the desktop</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.5.1/data/screenshots/settings.png</image>
+      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.5.2/data/screenshots/settings.png</image>
       <caption>Settings: the Sky tab, with the opaque sky and the choice of landscape</caption>
     </screenshot>
   </screenshots>
   <releases>
+    <release version="1.5.2" date="2026-10-25">
+      <description>
+        <p>A simpler, livelier wallpaper.</p>
+        <ul>
+          <li>One switch, "Live sky as wallpaper", replaces the four wallpaper choices</li>
+          <li>The wallpaper follows the sky every minute instead of every 5; GNOME shows it, blurred, behind the lock screen</li>
+          <li>The "Lock screen only" choice is gone: GNOME's lock screen only shows the desktop wallpaper</li>
+          <li>Settings → About lists how often observations and forecasts are refreshed</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.5.1" date="2026-10-25">
       <description>
         <p>The weather now, as measured where you are.</p>

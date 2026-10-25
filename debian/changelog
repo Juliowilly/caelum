@@ -1,3 +1,16 @@
+caelum (1.5.2-1) unstable; urgency=medium
+
+  * New upstream release 1.5.2.
+    - Wallpaper: one "Live sky as wallpaper" switch, updated every minute.
+      GNOME's lock screen shows the desktop wallpaper blurred and ignores its
+      own picture, so the "Lock screen only" choice is removed (migrated to
+      off; desktop/both choices stay on).
+    - Settings → About lists the observation and forecast intervals.
+    - Correction to 1.5.1: the snap does not refresh while Caelum runs;
+      snapd updates it once Caelum is closed.
+
+ -- Juliowilly <jw.adamagaba@gmail.com>  Sun, 25 Oct 2026 14:21:37 +0000
+
 caelum (1.5.1-1) unstable; urgency=medium
 
   * New upstream release 1.5.1.

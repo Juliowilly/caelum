@@ -1385,3 +1385,10 @@ Done (B):
   15 min (Open-Meteo) and 1 h (MET Norway)". It was hard-coded English and didn't mention
   observations. Now translated into fr/es/de/pt/it; a comment at `_REFRESH` points to it. Checked
   in German, the longest: it wraps cleanly.
+
+### Release 1.5.2 (2026-10-25)
+
+The user asked to release 1.5.2: the wallpaper switch (every minute) and the About line.
+- Version bump: `__init__`, debian/changelog (it also corrects 1.5.1's claim that the snap refreshes
+  while running), metainfo `<release>`, screenshots pinned to v1.5.2. The screenshots were not
+  re-rendered: only Settings changed.
