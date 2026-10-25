@@ -365,7 +365,8 @@ class SkyTracker(Gtk.Window):
     def _update_insets(self):
         """Keep the gear, compass and forecast off the taskbar: the sky covers the whole screen."""
         try:
-            edges, screen_w = self._win32.taskbar_edges()
+            hwnd = None if self._behind_icons else self._win32.hwnd_of(self.get_window())
+            edges, screen_w = self._win32.taskbar_edges(hwnd)
         except Exception as e:
             print(f'Caelum: no taskbar edges: {e}', file=sys.stderr, flush=True)
             return True

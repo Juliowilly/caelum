@@ -69,6 +69,8 @@ foreach ($mode in 'behind-icons', 'click-through-off') {
     # Compass (bottom left: centre 62 in, 78 up from the work area's corner): a click to the
     # right of the centre faces east
     [Desk]::Click($work.Left + 62 + 30, $work.Bottom - 78)
+    Start-Sleep -Seconds 1
+    $null = Shot "$mode-compass-click"
     Start-Sleep -Seconds 2
     $facing = (Get-Content "$cfgDir\config.json" | ConvertFrom-Json).facing
     if ([math]::Abs($facing - 90) -gt 1) { $failed += "${mode}: compass click (facing $facing)" }

@@ -1685,3 +1685,7 @@ auto-hide, scaled to GTK pixels).
 - The user chose to move the compass on Windows: it is now bottom left (centre 62 px in,
   r + 32 px above the taskbar's edge), clear of the desktop icons' column. Linux unchanged. The
   CI clicks it there.
+- CI caught it: with click-through off the compass click turned the view to 122°, not 90°. Windows
+  keeps that GTK window at 1024×749, but the taskbar margins came from the monitor (768 high), so
+  the compass sat 19 px higher. Margins are now measured from the window's own rectangle in that
+  mode (the desktop canvas is full-screen, so the monitor's are right there).

@@ -126,11 +126,19 @@ def _icon_layer():
     return (found[0], None) if found else None
 
 
-def taskbar_edges():
-    """((left, top, right, bottom) of the primary monitor covered by the taskbar, monitor width)."""
+def taskbar_edges(hwnd=None):
+    """
+    ((left, top, right, bottom) covered by the taskbar, width) of the primary monitor, or of the
+    window `hwnd` when given: Windows may keep a window short of the screen (1024×749 on a
+    1024×768 screen), so the margins are measured from its real edges.
+    """
     info = _primary_info()
     m, w = info.rcMonitor, info.rcWork
-    return (w.left - m.left, w.top - m.top, m.right - w.right, m.bottom - w.bottom), m.right - m.left
+    if hwnd:
+        m = wintypes.RECT()
+        user32.GetWindowRect(hwnd, ctypes.byref(m))
+    edges = (w.left - m.left, w.top - m.top, m.right - w.right, m.bottom - w.bottom)
+    return tuple(max(0, e) for e in edges), m.right - m.left
 
 
 def _primary_info():
