@@ -970,3 +970,12 @@ thick low cloud: 80% cirrus alone left the sun at ~33% and greyed the sky with t
   and when Caelum isn't running. The existing export ("Desktop background") already sets the wallpaper
   to Caelum's own sky every 5 min, and with the opaque sky it now has a proper day sky. A static image
   would be wrong for most of the day. README points to the export instead.
+
+### Release 1.3.0 (2026-10-25)
+- Contents: version in Settings + `--version`; weather refresh after suspend; click-through; explore
+  mode; opaque sky (on by default; export always opaque).
+- Version bump: `__init__.py`, `debian/changelog` 1.3.0-1, metainfo release notes, and screenshots pinned
+  to `v1.3.0`. `appstreamcli validate` passes.
+- Screenshots: `day.png` and `sunset.png` re-rendered with the opaque sky over the real forecast (scratch
+  `shots.py`, which now also takes a night shot). `night.png` kept: the new 21:00 full-moon render was
+  washed out, and the old 02:30 dark sky looks the same with the opaque sky. `settings.png` kept.
