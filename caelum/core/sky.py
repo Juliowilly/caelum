@@ -269,7 +269,7 @@ _LAND_LIGHT = (
 def landscape_light(el, clouds, m_bright):
     """
     How to relight a midday photo of the landscape: (rgb multiplier, saturation 0–1).
-    Overcast dims and cools it; moonlight lifts the night a little; colours fade as the eye
+    Overcast dims and cools it, rain darkens it; moonlight lifts the night a little; colours fade as the eye
     switches to night vision.
     """
     pts = _LAND_LIGHT
@@ -286,11 +286,26 @@ def landscape_light(el, clouds, m_bright):
     if cover > 0:
         dim = 1.0 - 0.40 * cover
         rgb = (rgb[0] * dim * (1 - 0.06 * cover), rgb[1] * dim, rgb[2] * dim * (1 + 0.04 * cover))
+    # Wet ground is darker
+    wet = _clamp(clouds.get('precip', 0.0) / 2.0, 0.0, 1.0)
+    if wet > 0:
+        rgb = tuple(c * (1.0 - 0.15 * wet) for c in rgb)
     if el < -6 and m_bright > 0:
         moon = _clamp(m_bright, 0.0, 1.0) * _clamp((-6 - el) / 6, 0.0, 1.0)
         rgb = _lerp(rgb, (0.16, 0.18, 0.25), moon * 0.6)
     sat = _clamp((el + 8) / 10, 0.15, 1.0)
     return tuple(_clamp(c, 0.0, 1.0) for c in rgb), sat
+
+def precip_intensity(precip):
+    """0–1 on a log scale, so a light drizzle (0.2 mm/h) already shows and 20 mm/h is the most."""
+    return _clamp(math.log1p(max(precip, 0.0)) / math.log1p(20.0), 0.0, 1.0)
+
+def rain_slant(speed, wind_from):
+    """Horizontal drift of a falling drop per unit of fall, from the real wind, as seen facing get_facing()."""
+    to = (wind_from + 180.0) % 360.0
+    rel = ((to - get_facing() + 180.0) % 360.0) - 180.0
+    # Wind across the view slants the rain; wind towards or away from the viewer barely does
+    return _clamp(math.sin(math.radians(rel)) * min(speed, 15.0) / 15.0 * 0.8, -0.8, 0.8)
 
 def moon_brightness(phase, m_el):
     illumination = (1 - math.cos(phase * 2 * math.pi)) / 2

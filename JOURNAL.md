@@ -1091,3 +1091,40 @@ thick low cloud: 80% cirrus alone left the sun at ~33% and greyed the sky with t
 - The user tested the beta. Snap rev 5 (1.3.1), then rev 6 (1.4.0), promoted to **stable**.
 - **Next release**: rework the rain rendering, especially so it fits the landscapes and the new
   opaque background (the user's request).
+
+### Rain and snow reworked for the landscapes (unreleased)
+- **Request**: improve the rain, especially with the photo landscapes and the opaque sky.
+- **What was wrong** (renders of plain/mountains/sea at day, dusk, night, plus snow):
+  - Rain was 1 px bluish ticks re-scattered at random 8 times a second, so it flickered rather than fell.
+  - It was drawn before the landscape, so trees and mountains hid all of it.
+  - Rain didn't change the scene: distant mountains stayed sharp and rain clouds looked like dry overcast.
+  - Lightning flashed the whole screen, landscape included, for any rain above 4 mm/h.
+  - Snow was a few static specks.
+- **New `gtk_ui/precip.py`**:
+  - **Depth layers**: one far rain layer falls behind the landscape; mid and near layers fall in front.
+    Each layer has its own speed, streak length, width and opacity. Positions follow the clock, so
+    drops fall continuously.
+  - **Performance**: each layer is drawn once into an alpha-only (A8) tile, a screen wide and half a
+    screen high, seamless both ways. Each frame scrolls it with whole-pixel offsets and a NEAREST
+    filter. Re-stroking ~1,600 lines every frame cost 35 ms. A fractional offset with the default
+    filter cost even more (pixman's slow path). Now rain adds ~7 ms to a frame at 1080p; the far
+    layer is 2 ms.
+  - **Wind**: `rain_slant` takes the wind component across the view, so a head or tail wind falls
+    straight.
+  - **Drop colour**: based on the horizon sky colour, made a little paler. Drops show against the
+    sky and more so against the ground. They are dark at night and pale by day.
+  - **Veil**: after the landscape, a haze in the horizon-sky colour. It is thickest at the horizon,
+    reaches up over the mountain tops and thins towards the foreground. Strength is min(1.7 ×
+    intensity, 0.85), or 2.2 × for snow, so 2 mm/h already hides most of a distant mountain.
+  - **Rain shafts**: under a broken sky (deck < 0.92), up to 3 grey curtains hang from the cloud base
+    to the horizon at azimuths fixed for the hour, so they turn with the view and lean with the wind.
+  - **`Storm`**: only for thunderstorm codes (WMO 95–99). The sky flashes in 2–3 decaying pulses
+    about every 7–12 s, half the time with a jagged bolt. It is drawn before the landscape, which
+    stays a dark silhouette.
+  - **Snow**: three layers of flakes that drift with the wind and sway. They are bigger and more
+    numerous, coloured from the horizon sky towards white, with a whiter veil.
+- **Scene**:
+  - Rain clouds darken: deck and cumulus undersides −38 % and tops −15 % at full intensity.
+  - `landscape_light` darkens wet ground by up to 15 % (full at 2 mm/h).
+- `precip_intensity` and `rain_slant` live in `core/sky.py` so they can be tested without cairo.
+  The old `_draw_rain` is gone. 4 new tests (38 in total); pyflakes clean.

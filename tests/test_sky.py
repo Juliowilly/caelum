@@ -3,7 +3,7 @@ import unittest
 from caelum.core.astronomy import phase_index
 from caelum.core.sky import (
     low_clouds, plane_to_sky,
-    band_slots, cloud_layers, landscape_light, mid_sheet, naked_eye_visibility, opaque_cover, opaque_sky, overcast_deck, set_facing, sky_to_screen, veil_transmission,
+    band_slots, cloud_layers, landscape_light, mid_sheet, naked_eye_visibility, opaque_cover, opaque_sky, overcast_deck, precip_intensity, rain_slant, set_facing, sky_to_screen, veil_transmission,
 )
 
 W, H = 1000, 500
@@ -184,6 +184,34 @@ class LandscapeLightTest(unittest.TestCase):
     def test_moonlight_lifts_the_night(self):
         self.assertGreater(sum(landscape_light(-30, self.CLEAR, 1.0)[0]),
                            sum(landscape_light(-30, self.CLEAR, 0.0)[0]))
+
+    def test_rain_darkens_the_ground(self):
+        grey = dict(total=100, low=100, mid=0, high=0)
+        self.assertLess(sum(landscape_light(45, dict(grey, precip=3.0), 0.0)[0]),
+                        sum(landscape_light(45, grey, 0.0)[0]) * 0.9)
+
+
+class PrecipTest(unittest.TestCase):
+    def tearDown(self):
+        set_facing(180.0)
+
+    def test_intensity_scale(self):
+        self.assertEqual(precip_intensity(0.0), 0.0)
+        self.assertGreater(precip_intensity(0.2), 0.05)   # drizzle already shows
+        self.assertLess(precip_intensity(2.0), precip_intensity(8.0))
+        self.assertEqual(precip_intensity(50.0), 1.0)
+
+    def test_crosswind_slants_rain_downwind(self):
+        set_facing(180.0)
+        # Facing south, a west wind blows to the east, which is on the viewer's left
+        self.assertLess(rain_slant(10.0, 270.0), -0.3)
+        self.assertGreater(rain_slant(10.0, 90.0), 0.3)
+
+    def test_head_wind_and_calm_fall_straight(self):
+        set_facing(180.0)
+        self.assertAlmostEqual(rain_slant(10.0, 180.0), 0.0, places=6)
+        self.assertEqual(rain_slant(0.0, 270.0), 0.0)
+        self.assertLessEqual(abs(rain_slant(40.0, 270.0)), 0.8)
 
 
 if __name__ == '__main__':

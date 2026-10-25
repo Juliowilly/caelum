@@ -27,8 +27,8 @@ from ..core.config import DEFAULT_CONFIG, load_config, save_config
 from ..core.i18n import _PHASE_NAMES, _day_name, _fmt_date, _t
 from ..core.sky import (
     _clamp, _cloud_palette, _lerp, _seg_dist, cloud_layers, get_facing, landscape_light,
-    mid_sheet, moon_brightness, naked_eye_visibility, opaque_sky, overcast_deck, set_facing,
-    sky_color_adaptive, sky_to_screen,
+    mid_sheet, moon_brightness, naked_eye_visibility, opaque_sky, overcast_deck, precip_intensity,
+    rain_slant, set_facing, sky_color_adaptive, sky_to_screen,
     veil_transmission,
 )
 from ..core.weather import (
@@ -39,6 +39,7 @@ from .clouds import (
 )
 from . import sandbox
 from .landscape import Landscape
+from . import precip as wx
 from .settings import SettingsDialog
 
 # ─── Window ───────────────────────────────────────────────────────────────────
@@ -97,6 +98,7 @@ class SkyTracker(Gtk.Window):
         self._cmp_r   = 46
         self._moonrise = self._moonset = None
         self._meteors  = []
+        self._storm    = wx.Storm()
         # Cloud layers' scroll offsets (screen widths); start where the wind left them
         self._drift   = {layer: time.time() / 600.0 * 0.618 % 4.0 for layer in _CLOUD_DRIFT}
         self._drift_t = time.monotonic()
@@ -790,7 +792,11 @@ class SkyTracker(Gtk.Window):
         if precip > 0:
             if self.cfg.get('show_rainbow', True):
                 self._draw_rainbow(cr, W, H, sun_el, sun_az, precip)
-            self._draw_rain(cr, W, H, precip, clouds.get('snow', False))
+            rain = self._precip_scene(sun_el, clouds, m_bright)
+            self._draw_precip(cr, W, H, rain, wx.FAR)
+            # Lightning lights the sky and clouds; the landscape stays a dark silhouette
+            if 95 <= clouds.get('wmo', 0) <= 99 and not rain['snow']:
+                self._storm.draw(cr, W, H, rain['t'], clouds.get('wmo', 0) >= 96)
 
         # Landscape last — always in front of sky, stars, and clouds
         land = self.cfg.get('landscape', 'plain')
@@ -798,6 +804,35 @@ class SkyTracker(Gtk.Window):
             self._draw_horizon_silhouette(cr, W, H)
         elif land != 'none' and not self._draw_landscape(cr, W, H, land, sun_el, clouds, m_bright):
             self._draw_horizon_silhouette(cr, W, H)   # photo not installed
+
+        if precip > 0:
+            wx.draw_veil(cr, W, H, rain['inten'], rain['snow'], rain['haze'])
+            self._draw_precip(cr, W, H, rain, wx.NEAR)
+
+    def _precip_scene(self, sun_el, clouds, m_bright):
+        """What the rain or snow looks like now: amount, wind slant, and colours lit by the scene."""
+        light, _sat = landscape_light(sun_el, clouds, m_bright)
+        lum  = _clamp(max(light) * 1.1, 0.0, 1.0)
+        snow = clouds.get('snow', False)
+        _zen, hor, _gt, _gb = opaque_sky(sun_el, clouds, m_bright)
+        # Drops catch the light: a little paler than the sky, so they show against it and
+        # (more) against the darker ground
+        if snow:
+            drop = _lerp(hor, (0.97, 0.98, 1.0), 0.45 + 0.4 * lum)
+        else:
+            drop = tuple(min(1.0, c * 1.25 + 0.07) for c in hor)
+        haze = _lerp(hor, (0.92, 0.93, 0.95), 0.35 * lum) if snow else hor
+        return dict(t=time.time(), snow=snow, inten=precip_intensity(clouds.get('precip', 0.0)),
+                    slant=rain_slant(clouds.get('wind_speed', 0.0), clouds.get('wind_dir', 180.0)),
+                    drop=drop, haze=haze, cover=overcast_deck(clouds),
+                    shaft=_lerp(hor, (0.35, 0.38, 0.44), 0.5) if not snow else haze)
+
+    def _draw_precip(self, cr, W, H, rain, layers):
+        if layers == wx.FAR:
+            wx.draw_shafts(cr, W, H, rain['inten'], rain['cover'], rain['slant'], rain['shaft'],
+                           int(rain['t'] // 3600))
+        draw = wx.draw_snow if rain['snow'] else wx.draw_rain
+        draw(cr, W, H, rain['t'], layers, rain['inten'], rain['slant'], rain['drop'])
 
     def _draw_landscape(self, cr, W, H, name, sun_el, clouds, m_bright):
         """Photo landscape, relit to the sun; cached until the view or the light changes.
@@ -1323,6 +1358,11 @@ class SkyTracker(Gtk.Window):
 
     def _render_clouds(self, cr, W, H, clouds, sun_el, body, drift, offset):
         top_col, dark_col, cir_col = _cloud_palette(sun_el)
+        # Rain clouds are thick: their bases go dark grey, their tops lose the glare
+        rain = precip_intensity(clouds.get('precip', 0.0))
+        if rain > 0:
+            dark_col = tuple(c * (1.0 - 0.38 * rain) for c in dark_col)
+            top_col  = tuple(c * (1.0 - 0.15 * rain) for c in top_col)
 
         low_cov, mid_cov, high_cov = cloud_layers(clouds)
         wmo = clouds.get('wmo', 0)
@@ -1620,46 +1660,6 @@ class SkyTracker(Gtk.Window):
             cr.stroke()
             still.append(m)
         self._meteors = still
-
-    # ── Rain / Snow ──────────────────────────────────────────────────────────
-
-    def _draw_rain(self, cr, W, H, precip, snow):
-        # Logarithmic scale so light drizzle (0.2mm) is already clearly visible
-        intensity = min(math.log1p(precip) / math.log1p(20.0), 1.0)
-        n         = int(intensity * 180) + 40
-        t_seed    = int(time.time() * 8)
-        rng       = random.Random(t_seed)
-        if snow:
-            for _ in range(n):
-                sx = rng.uniform(0, W)
-                sy = rng.uniform(0, H * 0.92)
-                cr.set_source_rgba(0.95, 0.97, 1.0, rng.uniform(0.35, 0.65))
-                cr.arc(sx, sy, rng.uniform(1.5, 3.0), 0, 2 * math.pi)
-                cr.fill()
-        else:
-            # Tilt streaks in the real wind direction from weather data
-            wind_spd = self._clouds.get('wind_speed', 0.0)
-            wind_frm = self._clouds.get('wind_dir',   180.0)
-            wind_to  = (wind_frm + 180.0) % 360.0
-            # Map wind_to azimuth to screen-space horizontal offset
-            # rel: positive = right of panorama centre, negative = left
-            rel_to   = ((wind_to - get_facing() + 180.0) % 360.0) - 180.0
-            tilt_x   = rel_to / 120.0 * min(wind_spd, 15.0) * 0.9
-            dy       = 14.0
-            dx       = _clamp(tilt_x, -12.0, 12.0)
-            cr.set_line_width(1.0)
-            # Alpha is independent of intensity — drop count already encodes how heavy the rain is
-            for _ in range(n):
-                sx = rng.uniform(0, W)
-                sy = rng.uniform(0, H * 0.92)
-                cr.set_source_rgba(0.70, 0.80, 1.0, rng.uniform(0.20, 0.38))
-                cr.move_to(sx, sy)
-                cr.line_to(sx + dx, sy + dy)
-                cr.stroke()
-            # Lightning — occasional full-screen flash during heavy rain
-            if precip > 4.0 and random.random() < 0.004:
-                cr.set_source_rgba(1.0, 1.0, 1.0, random.uniform(0.06, 0.20))
-                cr.paint()
 
     # ── Sun ──────────────────────────────────────────────────────────────────
 
