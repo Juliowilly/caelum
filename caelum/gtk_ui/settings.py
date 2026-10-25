@@ -6,7 +6,7 @@ import urllib.request
 
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, GLib
+from gi.repository import GLib, GObject, Gtk
 
 from .. import __version__
 from ..core.config import DEFAULT_CONFIG, save_config
@@ -78,6 +78,68 @@ _FACING_OPTIONS = [
     (315, 'NW', 'Facing North-West'),
 ]
 
+# ─── Layout helpers ──────────────────────────────────────────────────────────
+
+def _separator_header(row, before):
+    if before is not None and row.get_header() is None:
+        row.set_header(Gtk.Separator())
+
+def _group(page, title):
+    """A titled boxed list, GNOME-settings style; returns the ListBox to add rows to."""
+    head = Gtk.Label(xalign=0)
+    head.set_markup(f'<b>{GLib.markup_escape_text(title)}</b>')
+    head.set_margin_top(14)
+    head.set_margin_bottom(6)
+    page.pack_start(head, False, False, 0)
+    lb = Gtk.ListBox()
+    lb.set_selection_mode(Gtk.SelectionMode.NONE)
+    lb.set_header_func(_separator_header)
+    frame = Gtk.Frame()
+    frame.add(lb)
+    page.pack_start(frame, False, False, 0)
+    return lb
+
+def _row(lb, title, widget=None, subtitle=None, stacked=False):
+    """Title (and dim subtitle) on the left, widget on the right — or below when stacked."""
+    text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+    text.set_hexpand(True)
+    text.set_valign(Gtk.Align.CENTER)
+    text.pack_start(Gtk.Label(label=title, xalign=0), False, False, 0)
+    if subtitle:
+        sub = Gtk.Label(xalign=0)
+        sub.set_markup(f'<small>{GLib.markup_escape_text(subtitle)}</small>')
+        sub.set_line_wrap(True)
+        sub.set_max_width_chars(40)
+        sub.get_style_context().add_class('dim-label')
+        text.pack_start(sub, False, False, 0)
+    box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL if stacked else Gtk.Orientation.HORIZONTAL,
+                  spacing=6 if stacked else 12)
+    for side in ('top', 'bottom'):
+        getattr(box, f'set_margin_{side}')(8)
+    for side in ('start', 'end'):
+        getattr(box, f'set_margin_{side}')(12)
+    box.pack_start(text, True, True, 0)
+    if widget is not None:
+        if not stacked:
+            widget.set_valign(Gtk.Align.CENTER)
+        box.pack_start(widget, stacked, stacked, 0)
+    row = Gtk.ListBoxRow()
+    row.set_activatable(False)
+    row.set_can_focus(False)   # focus goes to the switch/entry, not a ring round the row
+    row.add(box)
+    lb.add(row)
+    return row
+
+def _page():
+    page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+    for side in ('start', 'end'):
+        getattr(page, f'set_margin_{side}')(18)
+    page.set_margin_bottom(18)
+    scroll = Gtk.ScrolledWindow()
+    scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+    scroll.add(page)
+    return scroll, page
+
 # ─── Settings dialog ──────────────────────────────────────────────────────────
 
 class SettingsDialog(Gtk.Window):
@@ -86,91 +148,80 @@ class SettingsDialog(Gtk.Window):
         super().__init__(title='Caelum — Settings')
         self.par = parent
         self.cfg = parent.cfg
-        self.set_default_size(330, 540)
+        self.set_default_size(440, 640)
         self.set_transient_for(parent)
         self.set_destroy_with_parent(True)
-        self.set_resizable(False)
 
-        outer  = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        self.add(outer)
-        scroll = Gtk.ScrolledWindow()
-        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        outer.pack_start(scroll, True, True, 0)
+        stack = Gtk.Stack()
+        stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
+        header = Gtk.HeaderBar()
+        header.set_show_close_button(True)
+        switcher = Gtk.StackSwitcher()
+        switcher.set_stack(stack)
+        header.set_custom_title(switcher)
+        self.set_titlebar(header)
+        self.add(stack)
 
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        box.set_margin_top(16)
-        box.set_margin_bottom(8)
-        box.set_margin_start(18)
-        box.set_margin_end(18)
-        scroll.add(box)
+        for name, title, build in (('sky',      _t('Sky'),      self._build_sky),
+                                   ('display',  _t('Display'),  self._build_display),
+                                   ('location', _t('Location'), self._build_location),
+                                   ('system',   _t('System'),   self._build_system)):
+            scroll, page = _page()
+            build(page)
+            stack.add_titled(scroll, name, title)
+        # Reopen on the tab used last
+        stack.show_all()
+        stack.set_visible_child_name(getattr(parent, '_settings_page', 'sky'))
+        stack.connect('notify::visible-child-name',
+                      lambda st, _p: setattr(parent, '_settings_page', st.get_visible_child_name()))
 
-        # ── Language ─────────────────────────────────────────────────────────
-        lang_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        lang_lbl = Gtk.Label(label=_t('Language'), xalign=0)
-        lang_lbl.set_hexpand(True)
-        self._lang_combo = Gtk.ComboBoxText()
-        cur_lang = self.cfg.get('language', 'auto')
-        for code, label in _LANG_OPTIONS:
-            self._lang_combo.append(code, label)
-        self._lang_combo.set_active_id(cur_lang if cur_lang in dict(_LANG_OPTIONS) else 'auto')
-        self._lang_combo.connect('changed', self._on_lang_changed)
-        lang_row.pack_start(lang_lbl, True, True, 0)
-        lang_row.pack_end(self._lang_combo, False, False, 0)
-        box.pack_start(lang_row, False, False, 2)
-
-        box.pack_start(Gtk.Separator(), False, False, 4)
-
-        # ── Master on/off ────────────────────────────────────────────────────
-        on_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        on_lbl = Gtk.Label(xalign=0)
-        on_lbl.set_markup(f'<b>{_t("Sky Overlay Active")}</b>')
-        on_lbl.set_hexpand(True)
-        sw_on = Gtk.Switch()
-        sw_on.set_active(self.cfg.get('app_enabled', True))
-        sw_on.connect('notify::active', lambda s, p: (
-            self.cfg.update({'app_enabled': s.get_active()}),
+    def _switch(self, key, default):
+        """Switch bound to a config key; saves and redraws on change."""
+        sw = Gtk.Switch()
+        sw.set_active(self.cfg.get(key, default))
+        sw.connect('notify::active', lambda s, p: (
+            self.cfg.update({key: s.get_active()}),
             save_config(self.cfg), self.par.da.queue_draw()))
-        on_row.pack_start(on_lbl, True, True, 0)
-        on_row.pack_end(sw_on, False, False, 0)
-        box.pack_start(on_row, False, False, 2)
+        return sw
 
-        as_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        as_lbl = Gtk.Label(label=_t('Start with GNOME session'), xalign=0)
-        as_lbl.set_hexpand(True)
-        sw_as = Gtk.Switch()
-        sw_as.set_active(autostart_enabled())
-        sw_as.connect('notify::active', lambda s, p: set_autostart(s.get_active()))
-        as_row.pack_start(as_lbl, True, True, 0)
-        as_row.pack_end(sw_as, False, False, 0)
-        box.pack_start(as_row, False, False, 2)
+    # ── Sky ──────────────────────────────────────────────────────────────────
 
-        box.pack_start(Gtk.Separator(), False, False, 6)
+    def _build_sky(self, page):
+        lb = _group(page, _t('Background'))
+        _row(lb, _t('Opaque Sky'), self._switch('opaque_sky', True),
+             _t('Off: your own wallpaper shows through, lit and tinted by Caelum'))
 
-        box.pack_start(Gtk.Label(label=_t('Aster Size'), xalign=0), False, False, 0)
+        lb = _group(page, _t('Sky Features'))
+        _row(lb, _t('Constellation Lines'), self._switch('show_constellations', True))
+        _row(lb, _t('Horizon Silhouette'), self._switch('show_silhouette', True))
+        _row(lb, _t('Rainbow'), self._switch('show_rainbow', True))
         sc = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0.5, 3.0, 0.1)
         sc.set_value(self.cfg.get('aster_scale', 1.0))
         sc.set_digits(1)
         sc.connect('value-changed', lambda s: (
             self.cfg.update({'aster_scale': s.get_value()}),
             save_config(self.cfg), self.par.da.queue_draw()))
-        box.pack_start(sc, False, False, 0)
+        _row(lb, _t('Aster Size'), sc, _t('Size of the sun, moon and planets'), stacked=True)
 
-        box.pack_start(Gtk.Separator(), False, False, 6)
+    # ── Display ──────────────────────────────────────────────────────────────
 
-        row_ic = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        l_ic   = Gtk.Label(label=_t('Astronomical Info Cards'), xalign=0)
-        l_ic.set_hexpand(True)
-        sw_ic  = Gtk.Switch()
-        sw_ic.set_active(self.cfg.get('show_info_cards', False))
-        sw_ic.connect('notify::active', lambda s, p: (
-            self.cfg.update({'show_info_cards': s.get_active()}),
-            save_config(self.cfg), self.par.da.queue_draw()))
-        row_ic.pack_start(l_ic, True, True, 0)
-        row_ic.pack_end(sw_ic, False, False, 0)
-        box.pack_start(row_ic, False, False, 2)
+    def _build_display(self, page):
+        lb = _group(page, _t('Overlay'))
+        _row(lb, _t('Sky Overlay Active'), self._switch('app_enabled', True),
+             _t('Off: only the gear stays on screen'))
+        _row(lb, _t('Clean Mode  (Ctrl+H)'), self._switch('clean_mode', False),
+             _t('Hide the info cards and the forecast column'))
+        _row(lb, _t('Click Through to Desktop'), self._switch('click_through', True),
+             _t('Clicks reach your desktop; click the compass or a card to explore the sky'))
 
-        box.pack_start(Gtk.Label(label=_t('Visible Cards'), xalign=0), False, False, 0)
+        lb = _group(page, _t('On-screen Widgets'))
+        _row(lb, _t('Compass Rose'), self._switch('show_compass', True))
+        _row(lb, _t('Horizon Direction Labels'), self._switch('show_horizon_labels', True))
+        _row(lb, _t('Weekly Forecast Column'), self._switch('show_weekly_forecast', True))
+        sw_ic = self._switch('show_info_cards', False)
+        _row(lb, _t('Astronomical Info Cards'), sw_ic)
 
+        lb = _group(page, _t('Visible Cards'))
         card_labels = {
             'clock':              _t('Clock & Date'),
             'location':           _t('Location & Coordinates'),
@@ -183,133 +234,106 @@ class SettingsDialog(Gtk.Window):
         }
         cards = self.cfg.setdefault('cards', dict(DEFAULT_CONFIG['cards']))
         for key, lbl in card_labels.items():
-            row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-            l   = Gtk.Label(label=lbl, xalign=0)
-            l.set_hexpand(True)
-            sw  = Gtk.Switch()
+            sw = Gtk.Switch()
             sw.set_active(cards.get(key, True))
             sw.connect('notify::active', self._card_toggle, key)
-            row.pack_start(l, True, True, 0)
-            row.pack_end(sw, False, False, 0)
-            box.pack_start(row, False, False, 2)
+            _row(lb, lbl, sw)
+        # The card list only matters while the info cards are shown
+        sw_ic.bind_property('active', lb, 'sensitive', GObject.BindingFlags.SYNC_CREATE)
 
-        box.pack_start(Gtk.Separator(), False, False, 6)
+    # ── Location ─────────────────────────────────────────────────────────────
 
-        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        l   = Gtk.Label(label=_t('Clean Mode  (Ctrl+H)'), xalign=0)
-        l.set_hexpand(True)
-        sw_c = Gtk.Switch()
-        sw_c.set_active(self.cfg.get('clean_mode', False))
-        sw_c.connect('notify::active', lambda s, p: (
-            self.cfg.update({'clean_mode': s.get_active()}),
-            save_config(self.cfg), self.par.da.queue_draw()))
-        row.pack_start(l, True, True, 0)
-        row.pack_end(sw_c, False, False, 0)
-        box.pack_start(row, False, False, 2)
+    def _build_location(self, page):
+        lb = _group(page, _t('Location'))
+        det_btn = Gtk.Button(label=_t('Detect automatically'))
+        det_btn.connect('clicked', self._detect_location)
+        self._det_status = Gtk.Label(label='', xalign=0)
+        self._det_status.set_line_wrap(True)
+        det_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        det_box.pack_start(det_btn, False, False, 0)
+        det_box.pack_start(self._det_status, False, False, 0)
+        for side in ('top', 'bottom'):
+            getattr(det_box, f'set_margin_{side}')(8)
+        for side in ('start', 'end'):
+            getattr(det_box, f'set_margin_{side}')(12)
+        det_row = Gtk.ListBoxRow()
+        det_row.set_activatable(False)
+        det_row.set_can_focus(False)
+        det_row.add(det_box)
+        lb.add(det_row)
 
-        row_os = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        l_os   = Gtk.Label(label=_t('Opaque Sky'), xalign=0)
-        l_os.set_hexpand(True)
-        l_os.set_tooltip_text('Paint the whole sky (bright blue by day, black at night) '
-                              'instead of tinting the wallpaper behind it.')
-        sw_os = Gtk.Switch()
-        sw_os.set_active(self.cfg.get('opaque_sky', True))
-        sw_os.connect('notify::active', lambda s, p: (
-            self.cfg.update({'opaque_sky': s.get_active()}),
-            save_config(self.cfg), self.par.da.queue_draw()))
-        row_os.pack_start(l_os, True, True, 0)
-        row_os.pack_end(sw_os, False, False, 0)
-        box.pack_start(row_os, False, False, 2)
+        for lbl, key, default in [
+            (_t('Latitude  (+N / -S)'), 'latitude',  6.1375),
+            (_t('Longitude (+E / -W)'), 'longitude', 1.2123),
+        ]:
+            e = Gtk.Entry()
+            e.set_width_chars(12)
+            e.set_text(str(self.cfg.get(key, default)))
+            setattr(self, f'_e_{key}', e)
+            _row(lb, lbl, e)
 
-        row_ct = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        l_ct   = Gtk.Label(label=_t('Click Through to Desktop'), xalign=0)
-        l_ct.set_hexpand(True)
-        l_ct.set_tooltip_text('Clicks on the sky reach the desktop icons and windows below; '
-                              'only the gear, compass and forecast cards respond. '
-                              'Turn off to hover constellation names.')
-        sw_ct = Gtk.Switch()
-        sw_ct.set_active(self.cfg.get('click_through', True))
-        sw_ct.connect('notify::active', lambda s, p: (
-            self.cfg.update({'click_through': s.get_active()}),
-            save_config(self.cfg), self.par.da.queue_draw()))
-        row_ct.pack_start(l_ct, True, True, 0)
-        row_ct.pack_end(sw_ct, False, False, 0)
-        box.pack_start(row_ct, False, False, 2)
+        self._tz_combo = Gtk.ComboBoxText()
+        for offset, label in _TZ_LIST:
+            self._tz_combo.append_text(label)
+        self._tz_combo.set_active(_tz_index(self.cfg.get('timezone_offset', 0)))
+        _row(lb, _t('Timezone'), self._tz_combo, stacked=True)
 
-        row2 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        l2   = Gtk.Label(label=_t('Constellation Lines'), xalign=0)
-        l2.set_hexpand(True)
-        sw_k = Gtk.Switch()
-        sw_k.set_active(self.cfg.get('show_constellations', True))
-        sw_k.connect('notify::active', lambda s, p: (
-            self.cfg.update({'show_constellations': s.get_active()}),
-            save_config(self.cfg), self.par.da.queue_draw()))
-        row2.pack_start(l2, True, True, 0)
-        row2.pack_end(sw_k, False, False, 0)
-        box.pack_start(row2, False, False, 2)
+        btn = Gtk.Button(label=_t('Save & Apply'))
+        btn.get_style_context().add_class('suggested-action')
+        btn.set_halign(Gtk.Align.END)
+        btn.set_margin_top(10)
+        btn.connect('clicked', self._save)
+        page.pack_start(btn, False, False, 0)
 
-        row3 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        l3   = Gtk.Label(label=_t('Horizon Silhouette'), xalign=0)
-        l3.set_hexpand(True)
-        sw_sil = Gtk.Switch()
-        sw_sil.set_active(self.cfg.get('show_silhouette', True))
-        sw_sil.connect('notify::active', lambda s, p: (
-            self.cfg.update({'show_silhouette': s.get_active()}),
-            save_config(self.cfg), self.par.da.queue_draw()))
-        row3.pack_start(l3, True, True, 0)
-        row3.pack_end(sw_sil, False, False, 0)
-        box.pack_start(row3, False, False, 2)
+        lb = _group(page, _t('Facing & Compass'))
+        hw_cmp = getattr(self.par, '_has_compass', False)
+        if not hw_cmp:
+            self._facing_combo = Gtk.ComboBoxText()
+            cur_facing = float(self.cfg.get('facing', 180.0))
+            for _, abbrev, dir_key in _FACING_OPTIONS:
+                self._facing_combo.append_text(f'{abbrev}  — {_t(dir_key)}')
+            best_i = min(range(len(_FACING_OPTIONS)),
+                         key=lambda i: abs(_FACING_OPTIONS[i][0] - cur_facing))
+            self._facing_combo.set_active(best_i)
+            self._facing_combo.connect('changed', self._on_facing_changed)
+            _row(lb, _t('Screen facing direction'), self._facing_combo,
+                 _t('The compass direction your screen looks toward'), stacked=True)
 
-        row4 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        l4   = Gtk.Label(label=_t('Compass Rose'), xalign=0)
-        l4.set_hexpand(True)
-        sw_cmp = Gtk.Switch()
-        sw_cmp.set_active(self.cfg.get('show_compass', True))
-        sw_cmp.connect('notify::active', lambda s, p: (
-            self.cfg.update({'show_compass': s.get_active()}),
-            save_config(self.cfg), self.par.da.queue_draw()))
-        row4.pack_start(l4, True, True, 0)
-        row4.pack_end(sw_cmp, False, False, 0)
-        box.pack_start(row4, False, False, 2)
+        cmp_stat = getattr(self.par, '_compass_status', 'Not detected')
+        self._cmp_status_lbl = Gtk.Label(xalign=1)
+        self._cmp_status_lbl.set_markup(f'<b>{cmp_stat}</b>')
+        _row(lb, _t('Compass sensor'), self._cmp_status_lbl)
 
-        row5 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        l5   = Gtk.Label(label=_t('Horizon Direction Labels'), xalign=0)
-        l5.set_hexpand(True)
-        sw_hl = Gtk.Switch()
-        sw_hl.set_active(self.cfg.get('show_horizon_labels', True))
-        sw_hl.connect('notify::active', lambda s, p: (
-            self.cfg.update({'show_horizon_labels': s.get_active()}),
-            save_config(self.cfg), self.par.da.queue_draw()))
-        row5.pack_start(l5, True, True, 0)
-        row5.pack_end(sw_hl, False, False, 0)
-        box.pack_start(row5, False, False, 2)
+        self._e_compass_port = Gtk.Entry()
+        self._e_compass_port.set_placeholder_text('/dev/ttyUSB0')
+        self._e_compass_port.set_text(self.cfg.get('compass_port', ''))
+        self._e_compass_port.set_hexpand(True)
+        conn_btn = Gtk.Button(label=_t('Connect'))
+        conn_btn.connect('clicked', self._connect_compass)
+        port_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        port_row.pack_start(self._e_compass_port, True, True, 0)
+        port_row.pack_start(conn_btn, False, False, 0)
+        _row(lb, _t('External serial compass port'), port_row,
+             'Arduino/USB dongle sending one heading per line. '
+             'Needs python3-serial.', stacked=True)
 
-        row6 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        l6   = Gtk.Label(label=_t('Rainbow'), xalign=0)
-        l6.set_hexpand(True)
-        sw_rb = Gtk.Switch()
-        sw_rb.set_active(self.cfg.get('show_rainbow', True))
-        sw_rb.connect('notify::active', lambda s, p: (
-            self.cfg.update({'show_rainbow': s.get_active()}),
-            save_config(self.cfg), self.par.da.queue_draw()))
-        row6.pack_start(l6, True, True, 0)
-        row6.pack_end(sw_rb, False, False, 0)
-        box.pack_start(row6, False, False, 2)
+    # ── System ───────────────────────────────────────────────────────────────
 
-        row8b = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        l8b   = Gtk.Label(label=_t('Weekly Forecast Column'), xalign=0)
-        l8b.set_hexpand(True)
-        sw_wf = Gtk.Switch()
-        sw_wf.set_active(self.cfg.get('show_weekly_forecast', True))
-        sw_wf.connect('notify::active', lambda s, p: (
-            self.cfg.update({'show_weekly_forecast': s.get_active()}),
-            save_config(self.cfg), self.par.da.queue_draw()))
-        row8b.pack_start(l8b, True, True, 0)
-        row8b.pack_end(sw_wf, False, False, 0)
-        box.pack_start(row8b, False, False, 2)
+    def _build_system(self, page):
+        lb = _group(page, _t('General'))
+        self._lang_combo = Gtk.ComboBoxText()
+        cur_lang = self.cfg.get('language', 'auto')
+        for code, label in _LANG_OPTIONS:
+            self._lang_combo.append(code, label)
+        self._lang_combo.set_active_id(cur_lang if cur_lang in dict(_LANG_OPTIONS) else 'auto')
+        self._lang_combo.connect('changed', self._on_lang_changed)
+        _row(lb, _t('Language'), self._lang_combo)
+        sw_as = Gtk.Switch()
+        sw_as.set_active(autostart_enabled())
+        sw_as.connect('notify::active', lambda s, p: set_autostart(s.get_active()))
+        _row(lb, _t('Start with GNOME session'), sw_as)
 
-        box.pack_start(Gtk.Label(label=_t('Export sky as wallpaper'), xalign=0),
-                       False, False, 2)
+        lb = _group(page, _t('Wallpaper'))
         _LS_OPTIONS = [
             ('off',        _t('Disabled')),
             ('background', _t('Desktop background only')),
@@ -327,97 +351,14 @@ class SettingsDialog(Gtk.Window):
             save_config(self.cfg)
             self.par._export_lockscreen_bg()
         ls_combo.connect('changed', _on_ls_changed)
-        box.pack_start(ls_combo, False, False, 2)
+        _row(lb, _t('Export sky as wallpaper'), ls_combo,
+             _t('Save the live sky as your wallpaper every 5 minutes'), stacked=True)
 
-        # ── Compass sensor status & serial port ──────────────────────────────
-        hw_cmp   = getattr(self.par, '_has_compass', False)
-        cmp_stat = getattr(self.par, '_compass_status', 'Not detected')
-        self._cmp_status_lbl = Gtk.Label(xalign=0)
-        self._cmp_status_lbl.set_markup(f'<small>Compass: <b>{cmp_stat}</b></small>')
-        box.pack_start(self._cmp_status_lbl, False, False, 2)
-
-        # Serial port entry
-        box.pack_start(Gtk.Label(label=_t('External serial compass port'), xalign=0),
-                       False, False, 2)
-        port_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        self._e_compass_port = Gtk.Entry()
-        self._e_compass_port.set_placeholder_text('/dev/ttyUSB0')
-        self._e_compass_port.set_text(self.cfg.get('compass_port', ''))
-        self._e_compass_port.set_hexpand(True)
-        conn_btn = Gtk.Button(label=_t('Connect'))
-        conn_btn.connect('clicked', self._connect_compass)
-        port_row.pack_start(self._e_compass_port, True, True, 0)
-        port_row.pack_start(conn_btn, False, False, 0)
-        box.pack_start(port_row, False, False, 0)
-
-        hint_serial = Gtk.Label(xalign=0)
-        hint_serial.set_markup('<small>Arduino/USB dongle sends heading as plain number per line.\n'
-                               'Install: <tt>sudo apt install python3-serial</tt></small>')
-        hint_serial.set_line_wrap(True)
-        box.pack_start(hint_serial, False, False, 2)
-
-        if not hw_cmp:
-            box.pack_start(Gtk.Label(label=_t('Screen facing direction'), xalign=0), False, False, 2)
-            self._facing_combo = Gtk.ComboBoxText()
-            cur_facing = float(self.cfg.get('facing', 180.0))
-            for _, abbrev, dir_key in _FACING_OPTIONS:
-                self._facing_combo.append_text(f'{abbrev}  — {_t(dir_key)}')
-            best_i = min(range(len(_FACING_OPTIONS)),
-                         key=lambda i: abs(_FACING_OPTIONS[i][0] - cur_facing))
-            self._facing_combo.set_active(best_i)
-            self._facing_combo.connect('changed', self._on_facing_changed)
-            box.pack_start(self._facing_combo, False, False, 0)
-
-        box.pack_start(Gtk.Separator(), False, False, 6)
-
-        # ── Location ─────────────────────────────────────────────────────────
-        box.pack_start(Gtk.Label(label=_t('Location'), xalign=0), False, False, 0)
-
-        det_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        det_btn = Gtk.Button(label=_t('Detect automatically'))
-        det_btn.connect('clicked', self._detect_location)
-        self._det_status = Gtk.Label(label='', xalign=0)
-        self._det_status.set_hexpand(True)
-        self._det_status.set_line_wrap(True)
-        det_row.pack_start(det_btn, False, False, 0)
-        det_row.pack_start(self._det_status, True, True, 0)
-        box.pack_start(det_row, False, False, 2)
-
-        for lbl, key, default in [
-            (_t('Latitude  (+N / -S)'), 'latitude',  6.1375),
-            (_t('Longitude (+E / -W)'), 'longitude', 1.2123),
-        ]:
-            box.pack_start(Gtk.Label(label=lbl, xalign=0), False, False, 2)
-            e = Gtk.Entry()
-            e.set_text(str(self.cfg.get(key, default)))
-            setattr(self, f'_e_{key}', e)
-            box.pack_start(e, False, False, 0)
-
-        # ── Timezone ─────────────────────────────────────────────────────────
-        box.pack_start(Gtk.Label(label=_t('Timezone'), xalign=0), False, False, 2)
-        self._tz_combo = Gtk.ComboBoxText()
-        cur_idx = _tz_index(self.cfg.get('timezone_offset', 0))
-        for offset, label in _TZ_LIST:
-            self._tz_combo.append_text(label)
-        self._tz_combo.set_active(cur_idx)
-        box.pack_start(self._tz_combo, False, False, 0)
-
-        btn = Gtk.Button(label=_t('Save & Apply'))
-        btn.set_margin_top(10)
-        btn.connect('clicked', self._save)
-        box.pack_start(btn, False, False, 0)
-
-        hint = Gtk.Label(xalign=0)
-        hint.set_markup('<small>Click the gear to reopen this dialog.\n'
-                        'Open-Meteo every 15 min · MET Norway every 1 h.</small>')
-        hint.set_margin_top(4)
-        box.pack_start(hint, False, False, 0)
-
-        version = Gtk.Label(xalign=0)
-        version.set_markup(f'<small>Caelum {__version__}</small>')
-        version.get_style_context().add_class('dim-label')
+        lb = _group(page, _t('About'))
+        version = Gtk.Label(label=__version__, xalign=1)
         version.set_selectable(True)
-        box.pack_start(version, False, False, 0)
+        _row(lb, 'Caelum', version)
+        _row(lb, _t('Weather'), None, 'Open-Meteo every 15 min · MET Norway every 1 h')
 
     def _on_lang_changed(self, combo):
         code = combo.get_active_id() or 'auto'
@@ -433,7 +374,7 @@ class SettingsDialog(Gtk.Window):
         if self.par._has_compass:
             GLib.timeout_add(500, self.par._poll_compass)
         status = getattr(self.par, '_compass_status', 'Not detected')
-        self._cmp_status_lbl.set_markup(f'<small>Compass: <b>{status}</b></small>')
+        self._cmp_status_lbl.set_markup(f'<b>{status}</b>')
         self.par.da.queue_draw()
 
     def _on_facing_changed(self, combo):

@@ -108,7 +108,10 @@ packaging/    build-deb.sh
 
 ## Configuration
 
-Click the gear button (bottom-right) to open Settings:
+Click the gear button (bottom-right) to open Settings. It has four tabs: **Sky** (opaque sky or your own
+wallpaper, sky features, aster size), **Display** (overlay, clean mode, click-through, on-screen widgets,
+info cards), **Location** (place, timezone, facing direction, compass) and **System** (language,
+autostart, wallpaper export, version):
 - Location (auto-detect or manual coordinates)
 - Timezone
 - Language

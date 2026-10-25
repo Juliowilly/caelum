@@ -985,3 +985,26 @@ thick low cloud: 80% cirrus alone left the sun at ~33% and greyed the sky with t
 - **GitHub release v1.3.0** with the .deb, .snap and .flatpak; downloaded assets' SHA-256 match.
 - **PPA**: 1.3.0 sources signed and uploaded for noble + resolute.
 - **Snap Store**: revision 4 → beta, waiting for the user's test before promoting to stable.
+
+### Settings dialog redesign (unreleased)
+- **Why**: the user couldn't find the "Opaque Sky" switch (they wanted their own wallpaper back). The
+  dialog was one long column of ~30 controls with few headings, and the new switch sat unexplained between
+  Clean Mode and Click Through.
+- **New layout** (`gtk_ui/settings.py`): a header bar with a `Gtk.StackSwitcher` and four tabs:
+  - **Sky**: Background (Opaque Sky), Sky Features (constellations, silhouette, rainbow, aster size).
+  - **Display**: Overlay (active, clean mode, click-through), On-screen Widgets, Visible Cards. The card
+    list is greyed out while the info cards are off (`bind_property`).
+  - **Location**: detect / lat / lon / timezone + Save & Apply (suggested-action); Facing & Compass.
+  - **System**: General (language, autostart), Wallpaper (export), About (version, weather sources).
+- Each group is a titled boxed `Gtk.ListBox` in a frame, with separators (GNOME-settings style). Helpers
+  are `_group`, `_row` (title + dim subtitle, widget at the right or stacked below), `_page` and
+  `SettingsDialog._switch(key, default)`, which replaces ten copies of the switch boilerplate.
+  Subtitles explain the non-obvious switches. For Opaque Sky: "Off: your own wallpaper shows through,
+  lit and tinted by Caelum".
+- Rows aren't focusable, so there's no focus ring round the first row; switches stay keyboard-reachable.
+  The dialog reopens on the last tab used (`parent._settings_page`). Size 440×640, resizable.
+- **i18n**: 21 new strings in fr/es/de/pt/it. Also added the Italian strings 1.3.0 missed (Opaque Sky,
+  Click Through, the explore hint).
+- **Verified**: screenshots of all four tabs in English and French. Programmatic check: the Opaque Sky
+  switch updates `cfg`, saves once and redraws; the tab is remembered across reopen. 26 tests pass,
+  pyflakes clean. `data/screenshots/settings.png` is still the old dialog; update it at the next release.
