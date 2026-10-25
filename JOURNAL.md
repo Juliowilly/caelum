@@ -883,3 +883,11 @@ thick low cloud: 80% cirrus alone left the sun at ~33% and greyed the sky with t
   Gotcha: this time **both** API endpoints (`api.launchpad.net` and `launchpad.net/api/devel`) kept
   reporting "Currently building" 20 min after the builds had finished; the build web pages
   (`…/+archive/ubuntu/caelum/+build/<id>`) were correct. All channels are now on 1.2.0.
+
+### Version shown in Settings and `caelum --version` (unreleased)
+- **`caelum --version` / `-V`** prints `Caelum X.Y.Z` and exits; `--help` also works. `main()` in
+  `gtk_ui/app.py` parses args with argparse before any window is made, so it works from the installed
+  `caelum` gui-script, `python3 -m caelum` and the snap's `bin/caelum` launcher.
+- **Settings dialog**: a small dim, selectable "Caelum X.Y.Z" label under the hint at the bottom,
+  from `caelum.__version__`. Checked with an off-screen dialog screenshot.
+- Motivation: the user had no easy way to tell which build (local .deb 1.0.1, PPA, snap, flatpak) was running.

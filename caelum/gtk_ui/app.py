@@ -1,11 +1,13 @@
 """Entry point for the GTK desktop overlay."""
 
+import argparse
 import os
 
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GLib  # noqa: E402
 
+from .. import __version__  # noqa: E402
 from .window import SkyTracker  # noqa: E402
 
 APP_ID = 'io.github.juliowilly.Caelum'
@@ -28,7 +30,10 @@ def _set_app_identity():
             pass
 
 
-def main():
+def main(argv=None):
+    parser = argparse.ArgumentParser(prog='caelum', description='Live sky overlay for the desktop.')
+    parser.add_argument('-V', '--version', action='version', version=f'Caelum {__version__}')
+    parser.parse_args(argv)
     _set_app_identity()
     win = SkyTracker()
     win.connect('destroy', Gtk.main_quit)

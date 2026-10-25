@@ -8,6 +8,7 @@ import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GLib
 
+from .. import __version__
 from ..core.config import DEFAULT_CONFIG, save_config
 from ..core.i18n import _LANG_OPTIONS, _set_lang, _t
 from .autostart import autostart_enabled, set_autostart
@@ -382,6 +383,12 @@ class SettingsDialog(Gtk.Window):
                         'Open-Meteo every 15 min · MET Norway every 1 h.</small>')
         hint.set_margin_top(4)
         box.pack_start(hint, False, False, 0)
+
+        version = Gtk.Label(xalign=0)
+        version.set_markup(f'<small>Caelum {__version__}</small>')
+        version.get_style_context().add_class('dim-label')
+        version.set_selectable(True)
+        box.pack_start(version, False, False, 0)
 
     def _on_lang_changed(self, combo):
         code = combo.get_active_id() or 'auto'
