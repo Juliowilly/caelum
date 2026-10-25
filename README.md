@@ -17,6 +17,7 @@ A native desktop widget that turns your screen background into a live, photoreal
 - **Planets** — Mercury, Venus, Mars, Jupiter, Saturn rendered with colour and Saturn's rings
 - **Stars** — 500-star catalog with twinkling, Milky Way band, shooting meteors, airglow
 - **Constellation lines** — 23 constellations with hover-to-name
+- **Photo landscapes** — a real panorama along the horizon (plain with trees, mountains or seaside), turning with your facing direction and relit by the sun and moon; or drawn hills, or nothing
 - **Real-time weather** — cloud layers, rain, snow, rainbow from Open-Meteo + MET Norway (no API key needed)
 - **Weekly forecast** — accordion-style column; click a day to expand hourly slots
 - **Cairo-drawn weather icons** — no external image files
@@ -164,3 +165,8 @@ All sources are free and require no API key.
 ## License
 
 MIT
+
+The landscape photos in `caelum/data/landscapes/` are panoramas from [Poly Haven](https://polyhaven.com),
+released under CC0: [noon_grass](https://polyhaven.com/a/noon_grass) by Greg Zaal,
+[alps_field](https://polyhaven.com/a/alps_field) and [spiaggia_di_mondello](https://polyhaven.com/a/spiaggia_di_mondello)
+by Andreas Mischok. `packaging/make-landscapes.py` rebuilds them (cut-out of the sky, resize).

@@ -3,7 +3,7 @@ import unittest
 from caelum.core.astronomy import phase_index
 from caelum.core.sky import (
     low_clouds, plane_to_sky,
-    band_slots, cloud_layers, mid_sheet, naked_eye_visibility, opaque_cover, opaque_sky, overcast_deck, set_facing, sky_to_screen, veil_transmission,
+    band_slots, cloud_layers, landscape_light, mid_sheet, naked_eye_visibility, opaque_cover, opaque_sky, overcast_deck, set_facing, sky_to_screen, veil_transmission,
 )
 
 W, H = 1000, 500
@@ -154,6 +154,36 @@ class OpaqueSkyTest(unittest.TestCase):
         moon = opaque_sky(-30, self.CLEAR, 1.0)[0]
         self.assertGreater(self.lum(moon), self.lum(dark))
         self.assertLess(max(moon), 0.12)
+
+
+class LandscapeLightTest(unittest.TestCase):
+    CLEAR = dict(total=0, low=0, mid=0, high=0)
+
+    def test_full_daylight_leaves_the_photo_alone(self):
+        self.assertEqual(landscape_light(45, self.CLEAR, 0.0), ((1.0, 1.0, 1.0), 1.0))
+
+    def test_darkens_and_fades_towards_night(self):
+        prev = 3.0
+        for el in (30, 8, 2, -2, -6, -12):
+            light, _sat = landscape_light(el, self.CLEAR, 0.0)
+            self.assertLessEqual(sum(light), prev, el)
+            prev = sum(light)
+        light, sat = landscape_light(-30, self.CLEAR, 0.0)
+        self.assertLess(max(light), 0.1)
+        self.assertLess(sat, 0.3)
+
+    def test_low_sun_is_warm(self):
+        r, g, b = landscape_light(3, self.CLEAR, 0.0)[0]
+        self.assertGreater(r, b + 0.15)
+
+    def test_overcast_dims(self):
+        clear = sum(landscape_light(45, self.CLEAR, 0.0)[0])
+        grey = sum(landscape_light(45, dict(total=100, low=100, mid=0, high=0), 0.0)[0])
+        self.assertLess(grey, clear * 0.75)
+
+    def test_moonlight_lifts_the_night(self):
+        self.assertGreater(sum(landscape_light(-30, self.CLEAR, 1.0)[0]),
+                           sum(landscape_light(-30, self.CLEAR, 0.0)[0]))
 
 
 if __name__ == '__main__':

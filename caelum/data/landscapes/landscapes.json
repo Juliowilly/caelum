@@ -1,0 +1,26 @@
+{
+  "plain": {
+    "top": 38.0,
+    "bottom": 40.0,
+    "south": 0.5,
+    "source": "https://polyhaven.com/a/noon_grass",
+    "author": "Greg Zaal",
+    "license": "CC0-1.0"
+  },
+  "mountains": {
+    "top": 30.0,
+    "bottom": 40.0,
+    "south": 0.5,
+    "source": "https://polyhaven.com/a/alps_field",
+    "author": "Andreas Mischok",
+    "license": "CC0-1.0"
+  },
+  "sea": {
+    "top": 28.0,
+    "bottom": 40.0,
+    "south": 0.0,
+    "source": "https://polyhaven.com/a/spiaggia_di_mondello",
+    "author": "Andreas Mischok",
+    "license": "CC0-1.0"
+  }
+}

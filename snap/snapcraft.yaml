@@ -55,6 +55,7 @@ parts:
       printf '#!/bin/sh\nexec /usr/bin/python3 -m caelum "$@"\n' > "$CRAFT_PART_INSTALL/bin/caelum"
       chmod 755 "$CRAFT_PART_INSTALL/bin/caelum"
       find caelum -name '*.py' -not -path 'caelum/kivy_ui/*' -exec install -D -m 644 {} "$SITE/{}" \;
+      find caelum/data -type f -exec install -D -m 644 {} "$SITE/{}" \;
       install -D -m 644 data/io.github.juliowilly.Caelum.svg \
         "$CRAFT_PART_INSTALL/usr/share/icons/hicolor/scalable/apps/io.github.juliowilly.Caelum.svg"
       install -D -m 644 data/io.github.juliowilly.Caelum.metainfo.xml \

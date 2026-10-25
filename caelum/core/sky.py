@@ -254,6 +254,44 @@ def opaque_sky(el, clouds, m_bright):
     ground_bot = tuple(c * 0.45 for c in ground_top)
     return zen, hor, ground_top, ground_bot
 
+# ─── Landscape light ─────────────────────────────────────────────────────────
+# (sun elevation °, rgb multiplier) for a daylight photo of the ground: full sun, warm low sun,
+# blue twilight, then the dark of night
+_LAND_LIGHT = (
+    (-12, (0.055, 0.060, 0.090)),
+    (-6,  (0.140, 0.140, 0.220)),
+    (-2,  (0.340, 0.300, 0.380)),
+    (2,   (0.700, 0.540, 0.420)),
+    (8,   (0.920, 0.820, 0.700)),
+    (16,  (1.000, 1.000, 1.000)),
+)
+
+def landscape_light(el, clouds, m_bright):
+    """
+    How to relight a midday photo of the landscape: (rgb multiplier, saturation 0–1).
+    Overcast dims and cools it; moonlight lifts the night a little; colours fade as the eye
+    switches to night vision.
+    """
+    pts = _LAND_LIGHT
+    if el <= pts[0][0]:
+        rgb = pts[0][1]
+    elif el >= pts[-1][0]:
+        rgb = pts[-1][1]
+    else:
+        for (e0, c0), (e1, c1) in zip(pts, pts[1:]):
+            if el < e1:
+                rgb = _lerp(c0, c1, (el - e0) / (e1 - e0))
+                break
+    cover = opaque_cover(clouds)
+    if cover > 0:
+        dim = 1.0 - 0.40 * cover
+        rgb = (rgb[0] * dim * (1 - 0.06 * cover), rgb[1] * dim, rgb[2] * dim * (1 + 0.04 * cover))
+    if el < -6 and m_bright > 0:
+        moon = _clamp(m_bright, 0.0, 1.0) * _clamp((-6 - el) / 6, 0.0, 1.0)
+        rgb = _lerp(rgb, (0.16, 0.18, 0.25), moon * 0.6)
+    sat = _clamp((el + 8) / 10, 0.15, 1.0)
+    return tuple(_clamp(c, 0.0, 1.0) for c in rgb), sat
+
 def moon_brightness(phase, m_el):
     illumination = (1 - math.cos(phase * 2 * math.pi)) / 2
     return illumination * _clamp((m_el + 10) / 40.0, 0, 1)

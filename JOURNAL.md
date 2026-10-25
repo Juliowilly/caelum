@@ -1008,3 +1008,52 @@ thick low cloud: 80% cirrus alone left the sun at ~33% and greyed the sky with t
 - **Verified**: screenshots of all four tabs in English and French. Programmatic check: the Opaque Sky
   switch updates `cfg`, saves once and redraws; the tab is remembered across reopen. 26 tests pass,
   pyflakes clean. `data/screenshots/settings.png` is still the old dialog; update it at the next release.
+
+### Photo landscapes along the horizon (unreleased)
+- **Request**: replace the dark horizon band with a green plain with a few trees. Also offer mountains
+  and the sea, using real images rather than drawings.
+- **Source**: Poly Haven 360° panoramas, **CC0**, so they are fine for Debian/PPA, snap and flatpak.
+  Unsplash/Pexels-style licences are not. Out of 997, picked for clear skies (clean cut-out) and fit:
+  - `noon_grass` (Greg Zaal): green field ringed with trees.
+  - `alps_field` (Andreas Mischok): meadow in an Alpine valley.
+  - `spiaggia_di_mondello` (Andreas Mischok): sandy beach, open sea, pines, headlands.
+  The thumbnails are camera renders, not panoramas, so I chose from contact sheets of the 8K tonemapped
+  JPEGs' horizon bands.
+- **`packaging/make-landscapes.py`** (dev-only: numpy + Pillow): downloads the panorama, keeps
+  +top°…−40° at 3600 px wide (10 px/°), and cuts the sky out:
+  - Sky probability: blue leading and bright enough (`b_min`), or pale low-saturation haze.
+  - Then a per-row sky colour model learnt from sure-sky pixels (`tol`), which catches the pale sky
+    near the horizon.
+  - A skyline per column from the top (first run of ≥ 3 ground pixels, never below the horizon).
+  - A 1-D grey opening (9 px, wrapping) drops cloud wisps and poles.
+  - Sky-coloured pixels above the horizon become holes (sky through canopies).
+  - Mask eroded 1 px then blurred 0.8 px: no pale rim when darkened.
+  - Per-photo tuning: the Alps need `b_min` 0.62 and `tol` 0.04, because hazy blue-grey cliffs are close
+    to the sky colour; at the defaults the central massif lost its top half.
+  - `top` = tallest feature + 2° (38°/30°/28°). Output: `<name>.jpg` (q82), `<name>-mask.png`
+    (opacity in the alpha channel, which is how cairo reads it), `landscapes.json`. ~2 MB in total.
+- **`gtk_ui/landscape.py`**: the photo and mask become one premultiplied ARGB surface. `render()` maps
+  screen → photo with a single cairo pattern matrix. Columns follow azimuth through `sky_to_screen`'s
+  constants, wrapping the panorama with `Extend.REPEAT`. Rows follow elevation. `south` is the panorama
+  column facing south. Then relighting: HSL_SATURATION towards grey (night vision) and MULTIPLY by the
+  light colour, both masked by the photo's own alpha so the sky stays untouched. Two transparent rows
+  above the photo stop the repeating pattern blending ground into the top edge; that showed as a grey
+  line across the sky.
+- **`core/sky.py` `landscape_light(el, clouds, m_bright)`** → (rgb multiplier, saturation). Keyframes
+  run from −12° to 16°: full sun → warm low sun → violet twilight → dark night. Overcast dims by up to
+  40 % and cools. Moonlight lifts the night. Saturation fades to 0.15.
+- **Window**: `_draw_landscape` replaces the silhouette as the last layer of `_draw_weather`, so the sun,
+  moon and clouds go behind real trees and mountains. It is cached per (size, facing, light quantised to
+  1/64, saturation to 1/32). Cost: +2 ms per cached frame at 1080p; a re-render is 62 ms, only when the
+  light changes. If the files are missing it falls back to the drawn hills.
+- **Config**: `landscape` = plain (default) | mountains | sea | hills | none, replacing
+  `show_silhouette`. Migration: an old config with the silhouette off gets `none`.
+- **Settings**: Sky tab → Background → "Landscape" combo with "Real photos, relit by the sun and moon".
+  It lists only the photos actually installed. The Horizon Silhouette switch is gone. fr/es/de/pt/it strings.
+- **Packaging**: pyproject `package-data` (covers .deb/PPA via pybuild and flatpak via pip; checked the
+  .deb ships all 7 files); snap installs `caelum/data` explicitly; `debian/copyright` CC0 stanza;
+  README credits.
+- **Verified**: renders of all three landscapes at noon / golden hour / sunset / moonlit night;
+  the Sky tab screenshot; the migration (silhouette off → none, on → plain); 8 new tests (lighting
+  model, shipped data complete and covering the screen). 34 tests pass, including inside the
+  .deb build; pyflakes clean.

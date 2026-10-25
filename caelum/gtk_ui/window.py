@@ -26,7 +26,7 @@ from ..core.catalog import _CONSTELLATIONS
 from ..core.config import DEFAULT_CONFIG, load_config, save_config
 from ..core.i18n import _PHASE_NAMES, _day_name, _fmt_date, _t
 from ..core.sky import (
-    _clamp, _cloud_palette, _lerp, _seg_dist, cloud_layers, get_facing,
+    _clamp, _cloud_palette, _lerp, _seg_dist, cloud_layers, get_facing, landscape_light,
     mid_sheet, moon_brightness, naked_eye_visibility, opaque_sky, overcast_deck, set_facing,
     sky_color_adaptive, sky_to_screen,
     veil_transmission,
@@ -38,6 +38,7 @@ from .clouds import (
     _soft_puff, draw_altocumulus, draw_cirrus, draw_cumulus, draw_deck, draw_mid_sheet,
 )
 from . import sandbox
+from .landscape import Landscape
 from .settings import SettingsDialog
 
 # ─── Window ───────────────────────────────────────────────────────────────────
@@ -84,6 +85,8 @@ class SkyTracker(Gtk.Window):
         self._input_rects        = ()     # input region last applied (see _update_input_region)
         self._explore_until      = 0.0    # monotonic deadline of explore mode (whole sky takes input)
         self._exporting          = False  # rendering the wallpaper/lock-screen image
+        self._landscapes         = {}     # name → Landscape (None if its files are missing)
+        self._land_cache         = None   # (key, surface, y) of the relit landscape
         self._city_name          = None   # reverse-geocoded city name
         self._moon_limb_angle    = 0.0    # stored each frame for use in info card icon
         self._today_str          = datetime.date.today().isoformat()
@@ -696,7 +699,7 @@ class SkyTracker(Gtk.Window):
                 cr.paint_with_alpha(sky_vis)
 
         # ── clouds, rain and silhouette in front of the sun, moon and planets
-        self._draw_weather(cr, W, H, sun_el, sun_az, m_el, m_az, self._clouds, scale)
+        self._draw_weather(cr, W, H, sun_el, sun_az, m_el, m_az, self._clouds, scale, m_bright)
 
         # Constellation names only meaningful at night
         if sun_el >= -5:
@@ -769,7 +772,7 @@ class SkyTracker(Gtk.Window):
             self._maybe_spawn_meteor(W, H)
             self._draw_meteors(cr, W, H)
 
-    def _draw_weather(self, cr, W, H, sun_el, sun_az, m_el, m_az, clouds, scale):
+    def _draw_weather(self, cr, W, H, sun_el, sun_az, m_el, m_az, clouds, scale, m_bright=0.0):
         if clouds['total'] > 0:
             # Disc to keep clear (or cover): the sun's bright core, else the moon
             body = None
@@ -789,9 +792,35 @@ class SkyTracker(Gtk.Window):
                 self._draw_rainbow(cr, W, H, sun_el, sun_az, precip)
             self._draw_rain(cr, W, H, precip, clouds.get('snow', False))
 
-        # Silhouette last — always in front of sky, stars, and clouds
-        if self.cfg.get('show_silhouette', True):
+        # Landscape last — always in front of sky, stars, and clouds
+        land = self.cfg.get('landscape', 'plain')
+        if land == 'hills':
             self._draw_horizon_silhouette(cr, W, H)
+        elif land != 'none' and not self._draw_landscape(cr, W, H, land, sun_el, clouds, m_bright):
+            self._draw_horizon_silhouette(cr, W, H)   # photo not installed
+
+    def _draw_landscape(self, cr, W, H, name, sun_el, clouds, m_bright):
+        """Photo landscape, relit to the sun; cached until the view or the light changes.
+        Returns False when the photo isn't available."""
+        if name not in self._landscapes:
+            try:
+                self._landscapes[name] = Landscape(name)
+            except Exception:
+                self._landscapes[name] = None
+        land = self._landscapes[name]
+        if land is None:
+            return False
+        light, sat = landscape_light(sun_el, clouds, m_bright)
+        key = (name, W, H, round(get_facing(), 1),
+               tuple(round(c * 64) for c in light), round(sat * 32))
+        if self._land_cache is None or self._land_cache[0] != key:
+            surf, y = land.render(W, H, get_facing(), tuple(round(c * 64) / 64 for c in light),
+                                  round(sat * 32) / 32)
+            self._land_cache = (key, surf, y)
+        _key, surf, y = self._land_cache
+        cr.set_source_surface(surf, 0, y)
+        cr.paint()
+        return True
 
     def _draw_horizon_effects(self, cr, W, H, sun_el, sun_az):
         """Layered horizon effects: Belt of Venus, pre-glow, golden-hour band, atmospheric haze."""

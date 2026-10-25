@@ -40,7 +40,7 @@ DEFAULT_CONFIG = {
     "keep_above": False,
     "sticky": True,
     "show_constellations": True,
-    "show_silhouette": True,
+    "landscape": "plain",          # plain | mountains | sea | hills (drawn) | none
     "show_compass": True,
     "show_horizon_labels": True,
     "show_rainbow": True,
@@ -71,6 +71,9 @@ def load_config():
         try:
             with open(CONFIG_PATH) as f:
                 cfg = json.load(f)
+            # 1.3 → 1.4: the silhouette switch became a landscape choice
+            if 'landscape' not in cfg and cfg.get('show_silhouette') is False:
+                cfg['landscape'] = 'none'
             for k, v in DEFAULT_CONFIG.items():
                 if k not in cfg:
                     cfg[k] = v

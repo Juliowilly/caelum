@@ -12,6 +12,7 @@ from .. import __version__
 from ..core.config import DEFAULT_CONFIG, save_config
 from ..core.i18n import _LANG_OPTIONS, _set_lang, _t
 from .autostart import autostart_enabled, set_autostart
+from .landscape import available as available_landscapes
 
 # ─── Timezone list ───────────────────────────────────────────────────────────
 # (utc_offset_hours, display_label)
@@ -190,10 +191,22 @@ class SettingsDialog(Gtk.Window):
         lb = _group(page, _t('Background'))
         _row(lb, _t('Opaque Sky'), self._switch('opaque_sky', True),
              _t('Off: your own wallpaper shows through, lit and tinted by Caelum'))
+        land_combo = Gtk.ComboBoxText()
+        options = [(k, _t(lbl)) for k, lbl in (('plain', 'Plain with trees'), ('mountains', 'Mountains'),
+                                               ('sea', 'Seaside'))
+                   if k in available_landscapes()]
+        options += [('hills', _t('Drawn hills')), ('none', _t('None'))]
+        for key, label in options:
+            land_combo.append(key, label)
+        cur = self.cfg.get('landscape', 'plain')
+        land_combo.set_active_id(cur if cur in dict(options) else 'hills')
+        land_combo.connect('changed', lambda c: (
+            self.cfg.update({'landscape': c.get_active_id() or 'plain'}),
+            save_config(self.cfg), self.par.da.queue_draw()))
+        _row(lb, _t('Landscape'), land_combo, _t('Real photos, relit by the sun and moon'))
 
         lb = _group(page, _t('Sky Features'))
         _row(lb, _t('Constellation Lines'), self._switch('show_constellations', True))
-        _row(lb, _t('Horizon Silhouette'), self._switch('show_silhouette', True))
         _row(lb, _t('Rainbow'), self._switch('show_rainbow', True))
         sc = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0.5, 3.0, 0.1)
         sc.set_value(self.cfg.get('aster_scale', 1.0))

@@ -37,3 +37,7 @@ version = { attr = "caelum.__version__" }
 [tool.setuptools.packages.find]
 include = ["caelum*"]
 exclude = ["caelum.kivy_ui*"]
+
+# Landscape photos (built by packaging/make-landscapes.py)
+[tool.setuptools.package-data]
+caelum = ["data/landscapes/*.jpg", "data/landscapes/*.png", "data/landscapes/*.json"]
