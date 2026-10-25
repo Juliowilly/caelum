@@ -1677,3 +1677,8 @@ auto-hide, scaled to GTK pixels).
   (ctypes COM, no new dependency; hardware, else WARP). Each Cairo frame is copied to the back
   buffer (UpdateSubresource; Cairo's premultiplied BGRA is B8G8R8A8_UNORM) and presented without
   waiting for vsync. If the canvas can't be made, the sky stays over the icons.
+- **Direct3D run: everything passes on the 24H2 layout.** Behind the icons the sky shows (99 % of
+  the desktop changed; icons drawn over it), repaints, and the hit layer takes the compass click
+  (view turned east), the gear (Settings opens) and the Display tab. Click-through off too.
+- Noticed: the compass (top left) sits under the first column of desktop icons on Windows, and
+  its click area covers part of them. To decide with the user.
