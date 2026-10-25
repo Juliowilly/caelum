@@ -1168,3 +1168,10 @@ thick low cloud: 80% cirrus alone left the sun at ~33% and greyed the sky with t
   Rendered off-screen like the 1.4.0 ones. Other screenshots unchanged; URLs pinned to `v1.5.0`.
 - Version bump: `__init__.py`, `debian/changelog` 1.5.0-1, metainfo release notes.
 - First release with `SHA256SUMS` among the assets (`make checksums`).
+- **Released**:
+  - GitHub `v1.5.0` with the deb, snap, flatpak and `SHA256SUMS`; the downloaded assets pass `sha256sum -c`.
+  - The deb build ran the 45 tests. The deb and snap contain the landscapes, `precip.py`, `geoip.py`
+    and `net.py`. The flatpak installed locally reports 1.5.0.
+  - The source tarball has no `compass_bridge.py` or `config.json`.
+  - PPA 1.5.0-1 uploaded for noble and resolute.
+  - Snap revision 7 → **beta**; stable stays at 1.4.0 (rev 6) until the user tests it.
