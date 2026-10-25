@@ -1350,3 +1350,5 @@ the 1.5.0 refresh had been refused because the app was running.
   - Only the snap was rebuilt (still 1.5.1, from the commit after the v1.5.1 tag). The GitHub
     .snap and SHA256SUMS were replaced. The .deb, flatpak and PPA packages don't contain
     snapcraft.yaml.
+- The user tested beta ("beta works"). Snap rev 9 (1.5.1) promoted to stable. 1.5.0 (rev 7)
+  never went to stable.
