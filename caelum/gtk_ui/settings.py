@@ -11,6 +11,7 @@ from ..core.config import DEFAULT_CONFIG, save_config
 from ..core.geoip import detect_location
 from ..core.i18n import _LANG_OPTIONS, _set_lang, _t
 from .autostart import autostart_enabled, set_autostart
+from . import photo_landscape
 from .landscape import available as available_landscapes, personal as personal_landscapes
 
 # ─── Timezone list ───────────────────────────────────────────────────────────
@@ -186,6 +187,128 @@ class SettingsDialog(Gtk.Window):
         stack.connect('notify::visible-child-name',
                       lambda st, _p: setattr(parent, '_settings_page', st.get_visible_child_name()))
 
+    def _fill_landscapes(self):
+        combo = self._land_combo
+        self._filling = True
+        combo.remove_all()
+        options = [(k, _t(lbl)) for k, lbl in (('plain', 'Plain with trees'), ('mountains', 'Mountains'),
+                                               ('sea', 'Seaside'))
+                   if k in available_landscapes()]
+        options += [(k, _t(photo_landscape.LABEL) if k == photo_landscape.NAME else lbl)
+                    for k, lbl in personal_landscapes()]
+        options += [('hills', _t('Drawn hills')), ('none', _t('None'))]
+        for key, label in options:
+            combo.append(key, label)
+        cur = self.cfg.get('landscape', 'plain')
+        combo.set_active_id(cur if cur in dict(options) else 'hills')
+        self._filling = False
+
+    def _on_landscape_changed(self, combo):
+        if self._filling:
+            return
+        self._use_landscape(combo.get_active_id() or 'plain')
+
+    def _use_landscape(self, name):
+        self.cfg.update({'landscape': name})
+        save_config(self.cfg)
+        self.par._landscapes.pop(photo_landscape.NAME, None)     # its files may have changed
+        self.par._land_cache = None
+        self.par.da.queue_draw()
+
+    # ── Your own photo as landscape ──
+
+    def _choose_photo(self, _btn):
+        # The native chooser goes through the file portal in the snap and the Flatpak: Caelum
+        # only ever sees the one file picked
+        chooser = Gtk.FileChooserNative.new(_t('Choose a photo'), self, Gtk.FileChooserAction.OPEN,
+                                            _t('Open'), _t('Cancel'))
+        photos = Gtk.FileFilter()
+        photos.set_name(_t('Photos (JPEG, PNG)'))
+        photos.add_mime_type('image/jpeg')
+        photos.add_mime_type('image/png')
+        chooser.add_filter(photos)
+        chooser.connect('response', self._on_photo_chosen)
+        self._chooser = chooser               # keep it alive until it answers
+        chooser.show()
+
+    def _on_photo_chosen(self, chooser, response):
+        path = chooser.get_filename() if response == Gtk.ResponseType.ACCEPT else None
+        self._chooser = None
+        if not path:
+            return
+        self._photo_busy(True, _t('Preparing the landscape…'))
+
+        def work():
+            try:
+                folder, meta = photo_landscape.build(path)
+                surf = photo_landscape.preview(folder, meta)
+            except photo_landscape.PhotoError as e:
+                GLib.idle_add(self._photo_busy, False, _t(str(e)))
+                return
+            except Exception:
+                GLib.idle_add(self._photo_busy, False, _t("This photo couldn't be read"))
+                return
+            GLib.idle_add(self._confirm_photo, folder, meta, surf)
+        threading.Thread(target=work, daemon=True).start()
+
+    def _photo_busy(self, busy, status=''):
+        for b in self._photo_buttons:
+            b.set_sensitive(not busy)
+        if not busy:
+            self._photo_remove.set_sensitive(photo_landscape.installed())
+        self._photo_status.set_text(status)
+        self._photo_status.set_visible(bool(status))
+        return False
+
+    def _confirm_photo(self, folder, meta, surf):
+        dialog = Gtk.Dialog(title=_t('Your photo as landscape'), transient_for=self, modal=True)
+        dialog.add_button(_t('Cancel'), Gtk.ResponseType.CANCEL)
+        dialog.add_button(_t('Use it'), Gtk.ResponseType.OK)
+        dialog.set_default_response(Gtk.ResponseType.OK)
+        image = Gtk.Image.new_from_surface(surf)
+        note = Gtk.Label(label=_t('Facing south. The scene covers half the horizon; '
+                                  'its mirror image covers the other half.'), xalign=0)
+        note.set_line_wrap(True)
+        note.get_style_context().add_class('dim-label')
+        area = dialog.get_content_area()
+        area.set_spacing(8)
+        for side in ('top', 'bottom', 'start', 'end'):
+            getattr(area, f'set_margin_{side}')(12)
+        area.pack_start(image, False, False, 0)
+        area.pack_start(note, False, False, 0)
+
+        def answered(d, response):
+            d.destroy()
+            if response == Gtk.ResponseType.OK:
+                try:
+                    photo_landscape.install(folder, meta)
+                except OSError:
+                    photo_landscape.discard(folder)
+                    self._photo_busy(False, _t("The landscape couldn't be saved"))
+                    return
+                self._use_landscape(photo_landscape.NAME)
+                self._fill_landscapes()
+                self._photo_busy(False)
+            else:
+                photo_landscape.discard(folder)
+                self._photo_busy(False)
+        dialog.connect('response', answered)
+        dialog.show_all()
+        return False
+
+    def _remove_photo(self, _btn):
+        try:
+            photo_landscape.remove()
+        except OSError:
+            self._photo_busy(False, _t("The landscape couldn't be removed"))
+            return
+        if self.cfg.get('landscape') == photo_landscape.NAME:
+            self._use_landscape('plain')
+        else:
+            self.par._landscapes.pop(photo_landscape.NAME, None)
+        self._fill_landscapes()
+        self._photo_busy(False)
+
     def _switch(self, key, default):
         """Switch bound to a config key; saves and redraws on change."""
         sw = Gtk.Switch()
@@ -201,20 +324,30 @@ class SettingsDialog(Gtk.Window):
         lb = _group(page, _t('Background'))
         _row(lb, _t('Opaque Sky'), self._switch('opaque_sky', True),
              _t('Off: your own wallpaper shows through, lit and tinted by Caelum'))
-        land_combo = Gtk.ComboBoxText()
-        options = [(k, _t(lbl)) for k, lbl in (('plain', 'Plain with trees'), ('mountains', 'Mountains'),
-                                               ('sea', 'Seaside'))
-                   if k in available_landscapes()]
-        options += personal_landscapes()
-        options += [('hills', _t('Drawn hills')), ('none', _t('None'))]
-        for key, label in options:
-            land_combo.append(key, label)
-        cur = self.cfg.get('landscape', 'plain')
-        land_combo.set_active_id(cur if cur in dict(options) else 'hills')
-        land_combo.connect('changed', lambda c: (
-            self.cfg.update({'landscape': c.get_active_id() or 'plain'}),
-            save_config(self.cfg), self.par.da.queue_draw()))
-        _row(lb, _t('Landscape'), land_combo, _t('Real photos, relit by the sun and moon'))
+        self._land_combo = Gtk.ComboBoxText()
+        self._fill_landscapes()
+        self._land_combo.connect('changed', self._on_landscape_changed)
+        _row(lb, _t('Landscape'), self._land_combo, _t('Real photos, relit by the sun and moon'))
+
+        choose = Gtk.Button(label=_t('Choose…'))
+        choose.connect('clicked', self._choose_photo)
+        self._photo_remove = Gtk.Button(label=_t('Remove'))
+        self._photo_remove.connect('clicked', self._remove_photo)
+        self._photo_remove.set_sensitive(photo_landscape.installed())
+        self._photo_buttons = (choose, self._photo_remove)
+        buttons = Gtk.Box(spacing=6)
+        buttons.pack_start(choose, False, False, 0)
+        buttons.pack_start(self._photo_remove, False, False, 0)
+        self._photo_status = Gtk.Label(xalign=0)
+        self._photo_status.set_line_wrap(True)
+        self._photo_status.get_style_context().add_class('dim-label')
+        self._photo_status.set_no_show_all(True)       # shown only with a message
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        box.pack_start(buttons, False, False, 0)
+        box.pack_start(self._photo_status, False, False, 0)
+        _row(lb, _t('Your own photo'), box,
+             _t('A wide outdoor shot or a phone panorama, with sky at the top. It stays on this computer.'),
+             stacked=True)
 
         lb = _group(page, _t('Sky Features'))
         _row(lb, _t('Constellation Lines'), self._switch('show_constellations', True))

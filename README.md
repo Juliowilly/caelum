@@ -121,6 +121,10 @@ autostart, wallpaper export, version):
 - Language
 - Facing direction (or live compass from phone via [PhyPhox](https://phyphox.org))
 - Toggle individual cards and visual features
+- Landscape: a photographed plain, mountains or seaside, drawn hills, none, or **your own photo**
+  (Settings → Sky → Your own photo → Choose…). Use a wide outdoor shot or a phone panorama with sky
+  at the top. Caelum cuts the sky out, spreads the scene over half the horizon and mirrors it over
+  the other half, and shows a preview before you confirm. Everything is done on your computer.
 - Opaque sky (on by default): Caelum paints the whole sky itself, bright blue by day and black at night,
   so the wallpaper no longer matters. Off, the sky is a tint over your wallpaper; then a dark navy
   wallpaper works best (e.g. a gradient `#05081A` → `#1A2440` at 72 % height → `#0A0C14`).
@@ -163,7 +167,9 @@ All sources are free and require no API key or account.
 **Privacy**: all requests use HTTPS. The weather, radar, airport-report and city-name services receive your coordinates
 rounded to 2 decimals (about 1 km), never more precise; RainViewer only learns which ~300 km map
 tile you are in. Nothing else about you is sent, and Caelum
-collects no statistics.
+collects no statistics. A photo you turn into a landscape never leaves your computer: Caelum reads
+only the file you pick (through the system file picker), refuses non-JPEG/PNG and oversized files,
+and saves the landscape without the photo's metadata (place, camera, date).
 
 ## License
 

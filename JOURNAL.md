@@ -1428,3 +1428,33 @@ in `__init__`, debian/changelog, metainfo (screenshots pinned to v1.5.3, not re-
 shipped landscapes look the same).
 - The user tested beta ("beta works"; their snap now runs 1.5.3 rev 11). Rev 11 promoted to stable.
   1.5.2 (rev 10) never went to stable: its changes reach stable users with 1.5.3.
+
+### Your own photo as landscape (unreleased)
+
+The user didn't want a landscape that exists only on their machine ("Any update must be global"),
+and asked for risks to be flagged first. I warned that shipping their yard photo would publish
+their home: the public repo's default location `6.1375, 1.2123` has 4 decimals (~11 m) and matches
+their own config. The user chose the general feature and said not to use their photos.
+
+- **Settings → Sky → Your own photo**: "Choose…" opens the native file chooser (the file portal in
+  the snap — `GTK_USE_PORTAL=1` there — and the Flatpak, so no new file permission is needed). The
+  build runs in a thread, then a preview dialog (the 240° seen facing south) offers "Use it" /
+  "Cancel". "Remove" deletes it. The menu lists it as "Your photo".
+- `caelum/gtk_ui/photo_landscape.py`, GdkPixbuf + cairo only (no numpy/OpenCV, so the .deb, snap
+  and Flatpak need nothing new):
+  - Checks: JPEG/PNG only (sniffed by GdkPixbuf, not the name), ≤ 50 MB, ≤ 120 MP, ≥ 400 px
+    wide. Decoded at ≤ 4000 px on the long side, then turned upright (EXIF orientation).
+  - Sky cut-out ported from make-landscapes.py to pure Python on a 480 px-wide copy: colour test,
+    sky colour per row, skyline (first 3 ground rows), 7-column opening, gaps in canopies, 1 px
+    erosion. "No sky found" if under half the columns have sky at the top.
+  - Geometry: the median skyline at 10°, the photo's bottom at −40°, and the tallest feature
+    capped at 35°. The photo spans 180° and is mirrored over the other 180°; south = 0.25.
+  - Built in a temporary folder next to the personal folder, then moved into place
+    (`os.replace`); `landscapes.json` is rewritten atomically. Fixed file names.
+  - The JPEG is re-encoded from the pixels, so no EXIF/GPS is carried over (tested with an EXIF
+    block).
+- Test photo: a slice of the CC0 "plain" over a drawn sky, plus fake GPS. Build 1.5 s; renders
+  at noon, sunset and night look right; the preview dialog and Settings row were screenshotted.
+- Tests (tests/test_photo_landscape.py): build/install/remove, mask (sky at the top, ground at the
+  bottom, mirrored), EXIF dropped, refusals (no sky, too small, not an image, too large). 83 pass.
+- Not shipped: the user's photos and the hand-installed "yard" from the previous step.
