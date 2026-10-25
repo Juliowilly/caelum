@@ -1509,3 +1509,27 @@ The user asked to release 1.5.5: the snap's "update waiting" note. Version bump 
 debian/changelog, metainfo (screenshots pinned to v1.5.5, not re-rendered). Privacy grep clean.
 - The user tested beta ("beta works"). Snap rev 13 (1.5.5) promoted to stable; stable users go
   from 1.5.3 to 1.5.5 with the photo landscapes, the location fix and the update note.
+
+### End of session (2026-10-25)
+
+Released today: 1.5.0 → 1.5.5. The Snap Store's stable channel is 1.5.5 (rev 13); GitHub and the
+PPA have 1.5.5. 1.5.0, 1.5.2 and 1.5.4 went to beta only and reached stable users through the next
+release.
+
+Rules agreed this session:
+- Every change is global: shipped to all users through the app, never a machine-only setup.
+  Security or privacy risks are raised before building.
+- No precise location tied to the user in any public file. Coordinates have ≤ 2 decimals; test
+  examples use neutral places. A privacy grep runs before every release.
+
+**Next session: Windows package**, then the Android APK (Kivy milestone 1 is already done).
+On Windows, the Linux-only parts must be replaced or turned off:
+- wallpaper export (gsettings/portal);
+- autostart (.desktop);
+- the snap/flatpak sandbox code and the snap update note;
+- XDG paths (→ `%APPDATA%`);
+- the desktop-level transparent overlay window;
+- the IIO / iio-sensor-proxy compass.
+
+The packaging route (e.g. GTK3/PyGObject via MSYS2 plus an installer) is to be chosen with the
+user first.
