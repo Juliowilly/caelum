@@ -1642,3 +1642,7 @@ auto-hide, scaled to GTK pixels).
   but hit control positions never updated. Likely GtkWindow's frozen updates while it waits for
   the configure of its own move/resize, raced by the Win32 placement. On Windows, GTK no longer
   moves/resizes the sky (default size before show; win32.py positions it). CI back to layered 0.
+- Bisection with a temporary `CAELUM_WIN_SKIP` switch (CI only): with the placement skipped GTK
+  draws ~95 frames / 10 s and the compass click works; skipping the extended styles, or the tray
+  and hit layer, changes nothing. So a call in place_sky stops GTK drawing. Next: SetParent, the
+  WS_POPUP/WS_CHILD style, SetWindowPos, SWP_FRAMECHANGED one at a time.

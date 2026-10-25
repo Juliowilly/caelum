@@ -182,9 +182,15 @@ def place_sky(hwnd, behind_icons):
         user32.SetWindowPos(hwnd, below or _HWND_BOTTOM, x, y, 0, 0, flags)
         _log(hwnd, 'behind the icons (24H2 Progman)' if below else 'behind the icons (WorkerW)')
         return True
-    user32.SetParent(hwnd, None)
-    user32.SetWindowLongPtrW(hwnd, _GWL_STYLE, (style | _WS_POPUP) & ~_WS_CHILD)
-    _just_above_icons(hwnd, x, y, flags)
+    skip = os.environ.get('CAELUM_WIN_SKIP', '')   # TEMPORARY: CI bisection
+    if 'parent' not in skip:
+        user32.SetParent(hwnd, None)
+    if 'wstyle' not in skip:
+        user32.SetWindowLongPtrW(hwnd, _GWL_STYLE, (style | _WS_POPUP) & ~_WS_CHILD)
+    if 'framechanged' in skip:
+        flags &= ~_SWP_FRAMECHANGED
+    if 'pos' not in skip:
+        _just_above_icons(hwnd, x, y, flags)
     _log(hwnd, 'bottom-most window' + ('' if not behind_icons else ' (no icon layer found)'))
     return False
 

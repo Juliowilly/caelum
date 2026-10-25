@@ -37,8 +37,9 @@ $cfgDir = "$env:APPDATA\caelum"
 New-Item -ItemType Directory -Force $cfgDir | Out-Null
 $failed = @()
 # TEMPORARY bisection: which Windows step stops GTK drawing (CAELUM_WIN_SKIP)
-$runs = @(@('click-through-off', ''), @('click-through-off', 'place'), @('click-through-off', 'style'),
-          @('click-through-off', 'tray,hit'), @('behind-icons', ''))
+$runs = @(@('click-through-off', 'parent'), @('click-through-off', 'wstyle'),
+          @('click-through-off', 'pos'), @('click-through-off', 'framechanged'),
+          @('click-through-off', 'parent,wstyle'))
 foreach ($run in $runs) {
     $place, $env:CAELUM_WIN_SKIP = $run
     $mode = "$place-skip-$($env:CAELUM_WIN_SKIP -replace ',', '+')"
