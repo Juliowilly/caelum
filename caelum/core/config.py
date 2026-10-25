@@ -65,15 +65,25 @@ def _migrate_legacy_config():
     except OSError:
         pass
 
+def _upgrade(cfg):
+    """Settings saved by older versions, in today's terms."""
+    # 1.3 → 1.4: the silhouette switch became a landscape choice
+    if 'landscape' not in cfg and cfg.get('show_silhouette') is False:
+        cfg['landscape'] = 'none'
+    # 1.5.1 → 1.6: GNOME's lock screen shows the desktop wallpaper (blurred) and ignores its own
+    # picture, so the wallpaper export is on ('both') or off. "Lock screen only" never showed
+    # anything: it stays off rather than replacing the user's desktop wallpaper.
+    if cfg.get('lockscreen_export') not in (None, 'off'):
+        cfg['lockscreen_export'] = 'both' if cfg['lockscreen_export'] in ('background', 'both') else 'off'
+
+
 def load_config():
     _migrate_legacy_config()
     if os.path.exists(CONFIG_PATH):
         try:
             with open(CONFIG_PATH) as f:
                 cfg = json.load(f)
-            # 1.3 → 1.4: the silhouette switch became a landscape choice
-            if 'landscape' not in cfg and cfg.get('show_silhouette') is False:
-                cfg['landscape'] = 'none'
+            _upgrade(cfg)
             for k, v in DEFAULT_CONFIG.items():
                 if k not in cfg:
                     cfg[k] = v

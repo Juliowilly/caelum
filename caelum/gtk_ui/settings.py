@@ -366,25 +366,15 @@ class SettingsDialog(Gtk.Window):
         _row(lb, _t('Start with GNOME session'), sw_as)
 
         lb = _group(page, _t('Wallpaper'))
-        _LS_OPTIONS = [
-            ('off',        _t('Disabled')),
-            ('background', _t('Desktop background only')),
-            ('lockscreen', _t('Lock screen only')),
-            ('both',       _t('Both background & lock screen')),
-        ]
-        ls_combo = Gtk.ComboBoxText()
-        cur_ls   = self.cfg.get('lockscreen_export', 'off')
-        for key, label in _LS_OPTIONS:
-            ls_combo.append(key, label)
-        ls_combo.set_active_id(cur_ls if cur_ls in dict(_LS_OPTIONS) else 'off')
-        def _on_ls_changed(combo):
-            mode = combo.get_active_id() or 'off'
-            self.cfg.update({'lockscreen_export': mode})
+        sw_wp = Gtk.Switch()
+        sw_wp.set_active(self.cfg.get('lockscreen_export', 'off') != 'off')
+        def _on_wp(sw, _p):
+            self.cfg.update({'lockscreen_export': 'both' if sw.get_active() else 'off'})
             save_config(self.cfg)
             self.par._export_lockscreen_bg()
-        ls_combo.connect('changed', _on_ls_changed)
-        _row(lb, _t('Export sky as wallpaper'), ls_combo,
-             _t('Save the live sky as your wallpaper every 5 minutes'), stacked=True)
+        sw_wp.connect('notify::active', _on_wp)
+        _row(lb, _t('Live sky as wallpaper'), sw_wp,
+             _t('Updated every minute. The lock screen shows it too, blurred by GNOME'))
 
         lb = _group(page, _t('About'))
         version = Gtk.Label(label=__version__, xalign=1)

@@ -125,7 +125,8 @@ autostart, wallpaper export, version):
   so the wallpaper no longer matters. Off, the sky is a tint over your wallpaper; then a dark navy
   wallpaper works best (e.g. a gradient `#05081A` → `#1A2440` at 72 % height → `#0A0C14`).
   For the wallpaper itself (seen in the Activities overview, or when Caelum isn't running), set
-  "Export sky as wallpaper" → *Desktop background only* (or *Both*): Caelum saves its own sky as the wallpaper every 5 minutes.
+  turn on "Live sky as wallpaper": Caelum saves its own sky as the wallpaper every minute. GNOME's lock
+  screen shows the desktop wallpaper, blurred, so the lock screen follows the sky too.
 - Click through to desktop (on by default): clicks on the sky reach the desktop icons and windows
   below; only the gear, compass and forecast cards respond. Clicking the compass or a card starts
   *explore mode*: the whole sky takes the mouse (constellation names on hover) until it is idle for 20 s,

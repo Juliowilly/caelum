@@ -121,7 +121,7 @@ class SkyTracker(Gtk.Window):
         GLib.timeout_add(100,              self._tick)
         GLib.timeout_add_seconds(5,        self._watch_weather)
         GLib.timeout_add_seconds(60,       self._check_update)
-        GLib.timeout_add(5 * 60 * 1000,  self._export_lockscreen_bg)
+        GLib.timeout_add_seconds(60,       self._export_lockscreen_bg)
         try:
             Gio.NetworkMonitor.get_default().connect('network-changed', self._on_network_changed)
         except Exception:

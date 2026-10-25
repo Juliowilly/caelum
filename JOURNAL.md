@@ -1352,3 +1352,32 @@ the 1.5.0 refresh had been refused because the app was running.
     snapcraft.yaml.
 - The user tested beta ("beta works"). Snap rev 9 (1.5.1) promoted to stable. 1.5.0 (rev 7)
   never went to stable.
+
+### Lock screen: what GNOME really shows (unreleased)
+
+The user asked for the live app on the lock screen instead of a screenshot. Findings (read-only):
+- No app window can be drawn above GNOME's lock screen. Only a Shell extension with
+  `session-modes: ["unlock-dialog"]` can draw there; GNOME 50's extensionSystem.js supports it.
+- GNOME 50's unlockDialog.js draws the **desktop** background (BackgroundManager) with a
+  Shell.BlurEffect. It never reads `org.gnome.desktop.screensaver picture-uri`. That has been the
+  case since GNOME 3.36, so Caelum's "Lock screen only" choice never showed anything on supported
+  Ubuntus.
+- extensions.gnome.org has rejected AI-generated extensions since Dec 2025, so an extension
+  could only ship in Caelum's own .deb.
+- Options given: A (extension, near-live sharp sky), B (fix the setting, export every minute),
+  C (B now, A later). Recommended C. **The user chose B**; A stays undecided.
+
+Done (B):
+- Settings → System → Wallpaper: the four-way combo became one switch, "Live sky as wallpaper",
+  with "Updated every minute. The lock screen shows it too, blurred by GNOME". fr/es/de/pt/it
+  strings replaced (pt in the Brazilian forms the file already uses).
+- The export runs every 60 s instead of every 5 min.
+  - Measured with the render harness at 960×540: render 3–38 ms, PNG 46–78 ms. Roughly ×4 at
+    1080p, with the PNG written in a thread.
+  - GNOME's background.js watches the file and reloads it on CHANGES_DONE_HINT, so only the file
+    is rewritten; the settings are re-set to the same URI.
+- `config._upgrade` gathers the settings migrations:
+  - background/both → both;
+  - lockscreen → **off**: it never showed anything, and turning it into 'both' would take over the
+    user's desktop wallpaper unasked.
+- tests/test_config.py: the migrations. 77 tests pass.
