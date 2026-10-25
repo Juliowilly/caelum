@@ -1,10 +1,50 @@
 """Cairo cloud rendering."""
 
+import functools
 import math
+import random
 
 import cairo
 
-from ..core.sky import _clamp
+from ..core.sky import _clamp, band_slots
+
+# ─── Cloud field ─────────────────────────────────────────────────────────────
+# Each layer is a fixed pool of clouds spread along a strip STRIP screens wide that wraps
+# around and scrolls with the wind (drift, in screen widths). Cover sets how many clouds of
+# the pool are shown, so a weather update adds or removes clouds instead of reshuffling.
+
+STRIP = 4.0
+_LOW_PITCH = 0.14   # band slot spacing (screen widths) ≈ width over which a cumulus hides the sun
+_MID_PITCH = 0.08
+
+@functools.lru_cache(maxsize=32)
+def _pool(layer, n):
+    """First n clouds of a layer: (strip position 0–1, seed for that cloud's shape)."""
+    return tuple((random.Random(f'{layer}:{i}:pos').random(), f'{layer}:{i}') for i in range(n))
+
+_band_slots = functools.lru_cache(maxsize=32)(band_slots)
+
+def _band(layer, cover, pitch, drift, W, body, reach):
+    """
+    Yield (screen x, fade, rng) for band clouds near the body. They fade out with distance
+    from it (gone at reach × pitch), so the band never shows as a row across the sky.
+    """
+    bx = body[0]
+    for u, k in _band_slots(layer, cover, STRIP, pitch):
+        x = ((u - drift) % STRIP) * W
+        for x in (x, x - STRIP * W):
+            fade = _clamp((reach * pitch * W - abs(x - bx)) / (0.6 * pitch * W), 0.0, 1.0)
+            if fade > 0:
+                yield x, fade, random.Random(f'{layer}:band:{k}:shape')
+
+def _visible(pool, drift, W, margin):
+    """Yield (screen x, rng) for pool clouds within margin of the screen."""
+    for u, seed in pool:
+        x = ((u * STRIP - drift) % STRIP) * W
+        if x > STRIP * W - margin:
+            x -= STRIP * W
+        if -margin < x < W + margin:
+            yield x, random.Random(seed)
 
 # ─── Cloud rendering ─────────────────────────────────────────────────────────
 
@@ -26,13 +66,6 @@ def _soft_puff(cr, cx, cy, rx, ry, r, g, b, alpha):
     cr.fill()
     cr.restore()
 
-def _overlaps(avoid, cx, cy, rx, ry):
-    """True if the ellipse (cx, cy, rx, ry) reaches into the avoid circle (x, y, r)."""
-    if not avoid:
-        return False
-    ax, ay, ar = avoid
-    return ((cx - ax) / (rx + ar)) ** 2 + ((cy - ay) / (ry + ar)) ** 2 < 1.0
-
 def _draw_overcast_sheet(cr, W, H, total, top_col, dark_col):
     """Uniform gray ceiling for heavily overcast skies (total > 65%)."""
     t  = _clamp((total - 65) / 35.0, 0.0, 1.0)
@@ -50,16 +83,15 @@ def _draw_overcast_sheet(cr, W, H, total, top_col, dark_col):
     cr.set_source(grad)
     cr.fill()
 
-def draw_cirrus(cr, W, H, coverage, col, rng):
+def draw_cirrus(cr, W, H, coverage, col, drift=0.0):
     """High-altitude ice clouds: thin wispy streaks with fade envelope and parallel fibers."""
     if coverage < 5:
         return
     r, g, b = col
-    n      = int(coverage / 100.0 * 10) + 1
+    n      = int((coverage / 100.0 * 10 + 1) * STRIP)
     a_base = 0.08 + 0.13 * (coverage / 100.0)
 
-    for _ in range(n):
-        cx     = rng.uniform(0.03, 0.97) * W
+    for cx, rng in _visible(_pool('high', n), drift, W, 0.2 * W):
         cy     = rng.uniform(0.02, 0.26) * H
         length = rng.uniform(0.08, 0.30) * W
         thick  = rng.uniform(0.005, 0.013) * H
@@ -105,40 +137,34 @@ def _altocumulus_clump(cr, cx, cy, cw, ch, a, col, shade, rng):
         _soft_puff(cr, cx + ox, cy + oy + ph * 0.30, pw * 0.85, ph * 0.20,
                    rs, gs, bs, a * 0.30)
 
-def draw_altocumulus(cr, W, H, coverage, col, rng, avoid=None, cover=None):
+def draw_altocumulus(cr, W, H, coverage, col, drift=0.0, body=None):
     """
     Mid-level clouds: compact rounded puffs with lit top and shadowed underside.
-    avoid=(x, y, r) keeps clumps off the sun/moon disc; cover=(x, y) puts a patch in front of it.
+    body=(x, y, r): the sun/moon, which the drifting band of patches passes over.
     """
     if coverage < 5:
         return
     r, g, b = col
     shade  = (r * 0.68, g * 0.70, b * 0.72)   # shadow underside colour
-    n      = int(coverage / 100.0 * 24) + 3
+    n      = int((coverage / 100.0 * 24 + 3) * STRIP)
     a_base = 0.70 + 0.28 * (coverage / 100.0)
 
-    for _ in range(n):
-        for _try in range(8):
-            cx = rng.uniform(0.02, 0.98) * W
-            cy = rng.uniform(0.08, 0.58) * H
-            cw = rng.uniform(0.022, 0.062) * W
-            ch = rng.uniform(0.012, 0.030) * H
-            if not _overlaps(avoid, cx, cy, cw, ch):
-                break
-        else:
-            continue
+    for cx, rng in _visible(_pool('mid', n), drift, W, 0.08 * W):
+        cy = rng.uniform(0.08, 0.58) * H
+        cw = rng.uniform(0.022, 0.062) * W
+        ch = rng.uniform(0.012, 0.030) * H
         _altocumulus_clump(cr, cx, cy, cw, ch, a_base * rng.uniform(0.65, 1.00),
                            col, shade, rng)
 
-    if cover:
-        # A patch of several clumps across the body: it shows through the gaps, dimmed
-        bx, by = cover
-        for _ in range(rng.randint(4, 6)):
-            _altocumulus_clump(cr,
-                               bx + rng.uniform(-0.035, 0.035) * W,
-                               by + rng.uniform(-0.025, 0.025) * H,
-                               rng.uniform(0.040, 0.065) * W, rng.uniform(0.022, 0.032) * H,
-                               a_base * rng.uniform(0.85, 1.00), col, shade, rng)
+    if body:
+        # A patch of clumps per slot, centred on the body's height
+        for cx, fade, rng in _band('mid', coverage, _MID_PITCH, drift, W, body, 1.0):
+            for _ in range(rng.randint(1, 2)):
+                _altocumulus_clump(cr,
+                                   cx + rng.uniform(-0.020, 0.020) * W,
+                                   body[1] + rng.uniform(-0.015, 0.015) * H,
+                                   rng.uniform(0.030, 0.050) * W, rng.uniform(0.016, 0.028) * H,
+                                   a_base * fade * rng.uniform(0.85, 1.00), col, shade, rng)
 
 def _cumulus_cloud(cr, W, H, cx, base_y, cw, ch, a_base, top_col, dark_col, rng, anvil=False):
     rt, gt, bt = top_col
@@ -195,42 +221,37 @@ def _cumulus_cloud(cr, W, H, cx, base_y, cw, ch, a_base, top_col, dark_col, rng,
         _soft_puff(cr, cx, anvil_y - ch * 0.06, cw * 1.35, ch * 0.10,
                    rd * 0.65, gd * 0.65, bd * 0.72, a_base * 0.45)
 
-def draw_cumulus(cr, W, H, coverage, top_col, dark_col, rng, wmo=0, avoid=None, cover=None):
+def draw_cumulus(cr, W, H, coverage, top_col, dark_col, wmo=0, drift=0.0, body=None):
     """
     Low cumulus: crisp flat base, cauliflower puff tower, specular highlight,
     ground shadow. Cumulonimbus anvil for thunderstorm WMO codes (≥95).
-    avoid=(x, y, r) keeps clouds off the sun/moon disc; cover=(x, y) puts one in front of it.
+    body=(x, y, r): the sun/moon, which the drifting band of clouds passes over.
     """
     if coverage < 5:
         return
-    is_cb = wmo >= 95
-    n      = int(coverage / 100.0 * 8) + 1
+    is_cb  = wmo >= 95
+    n      = int((coverage / 100.0 * 8 + 1) * STRIP)
     a_base = 0.48 + 0.42 * (coverage / 100.0)
 
-    for i in range(n):
-        big = is_cb and i == 0
-        for _try in range(8):
-            cx = rng.uniform(0.04, 0.96) * W
-            # Cloud base sits near the horizon (LCL level)
-            base_y = rng.uniform(0.54, 0.70) * H
-            if big:
-                cw = rng.uniform(0.18, 0.34) * W
-                ch = rng.uniform(0.20, 0.34) * H
-            else:
-                cw = rng.uniform(0.07, 0.21) * W
-                ch = rng.uniform(0.06, 0.13) * H
-            # The cloud's extent: half its width either side, from the base up one height
-            if not _overlaps(avoid, cx, base_y - ch * 0.45, cw * 0.55, ch * 0.60):
-                break
+    for i, (cx, rng) in enumerate(_visible(_pool('low', n), drift, W, 0.4 * W)):
+        # Cloud base sits near the horizon (LCL level)
+        base_y = rng.uniform(0.54, 0.70) * H
+        big    = is_cb and i % 5 == 0
+        if big:
+            cw = rng.uniform(0.18, 0.34) * W
+            ch = rng.uniform(0.20, 0.34) * H
         else:
-            continue
+            cw = rng.uniform(0.07, 0.21) * W
+            ch = rng.uniform(0.06, 0.13) * H
         _cumulus_cloud(cr, W, H, cx, base_y, cw, ch, a_base, top_col, dark_col, rng,
                        anvil=big)
 
-    if cover:
-        # One cloud drawn across the body, its dense lower body over the disc
-        bx, by = cover
-        cw = rng.uniform(0.13, 0.20) * W
-        ch = rng.uniform(0.09, 0.13) * H
-        _cumulus_cloud(cr, W, H, bx + rng.uniform(-0.15, 0.15) * cw, by + ch * 0.20,
-                       cw, ch, max(a_base, 0.95), top_col, dark_col, rng)
+    if body:
+        # One cloud per slot, its dense lower body at the body's height
+        for cx, fade, rng in _band('low', coverage, _LOW_PITCH, drift, W, body, 1.5):
+            cw = rng.uniform(0.14, 0.18) * W
+            ch = rng.uniform(0.09, 0.13) * H
+            if body[1] + ch * 0.20 > 0.70 * H:
+                continue   # body at the horizon: the general clouds cover it
+            _cumulus_cloud(cr, W, H, cx, body[1] + ch * 0.20, cw, ch,
+                           max(a_base, 0.95) * fade, top_col, dark_col, rng)

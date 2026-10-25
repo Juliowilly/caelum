@@ -2,7 +2,7 @@ import unittest
 
 from caelum.core.astronomy import phase_index
 from caelum.core.sky import (
-    body_occluders, cloud_layers, opaque_cover, set_facing, sky_to_screen, veil_transmission,
+    band_slots, cloud_layers, opaque_cover, set_facing, sky_to_screen, veil_transmission,
 )
 
 W, H = 1000, 500
@@ -54,13 +54,16 @@ class CloudOpticsTest(unittest.TestCase):
         self.assertLess(veil_transmission(_clouds(100, low=100)), 0.2)
         self.assertEqual(opaque_cover(_clouds(100, low=100)), 1.0)
 
-    def test_body_covered_as_often_as_the_sky(self):
+    def test_band_covers_the_body_as_often_as_the_sky(self):
+        # Slots are ~one cloud wide, so the share of slots shown = share of time covered
         for cov in (0, 30, 60, 100):
-            hits = sum('low' in body_occluders(_clouds(cov, low=cov), seed)
-                       for seed in range(2000))
-            self.assertAlmostEqual(hits / 2000, cov / 100, delta=0.04, msg=f'{cov}%')
-        self.assertEqual(body_occluders(_clouds(80, high=80), 1), set())
+            shown = len(band_slots('low', cov, 400.0, 0.1)) / 4000
+            self.assertAlmostEqual(shown, cov / 100, delta=0.03, msg=f'{cov}%')
 
+    def test_cover_change_keeps_existing_clouds_in_place(self):
+        less = set(band_slots('low', 30, 4.0, 0.14))
+        more = set(band_slots('low', 60, 4.0, 0.14))
+        self.assertTrue(less <= more)
 
 if __name__ == '__main__':
     unittest.main()

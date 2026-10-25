@@ -96,7 +96,7 @@ def veil_transmission(clouds):
     """
     Uniform dimming of the sun/moon by layers dense enough to form a continuous sheet.
     Broken cloud does not dim the sun everywhere; it hides it only where a cloud is drawn
-    in front of it (see body_occluders). Cirrus is a thin veil at any cover.
+    in front of it (see band_slots). Cirrus is a thin veil at any cover.
     """
     low, mid, high = cloud_layers(clouds)
     t  = 1.0 - 0.15 * _clamp(high / 100.0, 0.0, 1.0)         # cirrostratus
@@ -104,15 +104,19 @@ def veil_transmission(clouds):
     t *= 1.0 - 0.85 * _clamp((low - 70) / 30.0, 0.0, 1.0)    # stratus / stratocumulus deck
     return t
 
-def body_occluders(clouds, seed):
+def band_slots(layer, cover, strip, pitch):
     """
-    Layers ('low', 'mid') with a cloud in front of the sun/moon for this seed (time slot).
-    Each layer covers the body with a chance equal to its cover, so over many slots the
-    body is hidden as often as the sky is covered: 30% cover → hidden ~30% of the time.
+    Clouds of the band that drifts past the sun/moon: fixed slots every `pitch` along a
+    wrap-around strip of length `strip`, each shown with a chance equal to the cover.
+    A slot's cloud is about `pitch` wide, so as the band drifts the body is hidden for
+    that share of the time. Returns [(centre, slot index)] of the slots shown; a cover
+    change only adds or removes slots, it never moves the others.
     """
-    rng = random.Random(seed)
-    low, mid, _high = cloud_layers(clouds)
-    return {name for name, cov in (('low', low), ('mid', mid)) if rng.random() * 100 < cov}
+    out = []
+    for k in range(int(round(strip / pitch))):
+        if random.Random(f'{layer}:band:{k}').random() * 100 < cover:
+            out.append(((k + 0.5) * pitch, k))
+    return out
 
 def sky_color_adaptive(el, clouds, m_bright):
     r, g, b, a = sky_color(el)

@@ -747,3 +747,37 @@ thick low cloud: 80% cirrus alone left the sun at ~33% and greyed the sky with t
 - 5 new tests (`CloudOpticsTest`), 13 pass; pyflakes clean.
 - Not changed: overcast still looks like big puffs on a grey sheet rather than a uniform deck, and
   the cloud pattern is reshuffled hourly (no drift yet). Both are candidates for the next step.
+
+### Drifting clouds (replaces the hourly reshuffle and the occluder roll)
+- **Cloud field** (`gtk_ui/clouds.py`): each layer is a fixed pool of clouds on a wrap-around strip
+  `STRIP` = 4 screens wide, seeded per cloud (`'low:7'` …), so cover only sets *how many* of the
+  pool are shown. A weather update adds/removes clouds; it never reshuffles the sky. Pool positions
+  and band slots are `lru_cache`d.
+- **Wind drift** (`window._advance_cloud_drift`): per-layer offsets integrate
+  `side × wind × deg_per_ms / 240°` each frame (`_CLOUD_DRIFT` low 0.020 / mid 0.012 / high
+  0.007 °/s per m/s: higher = farther = slower across the view). `side` = sin(wind_to − facing),
+  at least ±0.25 so wind toward/away from you still moves something; wind ≥ 1.5 m/s (winds aloft
+  are rarely calm); dt capped at 1 s so there is no jump after suspend. Initial offsets come from
+  the wall clock, so each start doesn't show the same sky. 5 m/s → a low cloud crosses the sun in
+  ~6–8 min.
+- **Band past the sun/moon** (replaces `body_occluders` + avoid/cover): calibrating the general
+  clouds so drawn area = cover would need dozens of cumulus per screen (measured: 8/screen covers
+  ~17% at 60% cover). Instead `core.sky.band_slots()` puts fixed slots every ~one cloud width
+  (low 0.14 W, mid 0.08 W) on the strip at the body's height, each shown with chance = cover; as
+  the band drifts the body is hidden that share of the time. Band clouds fade out within
+  1.5 (low) / 1.0 (mid) pitches of the body, so they never show as a row. Slots are stable:
+  more cover only adds slots (tested).
+- **Performance — cloud layer cached** (`_draw_clouds` → `_render_clouds`): the app redraws at
+  10 Hz and was already **~123 ms/frame at 1920×1080** (software Cairo, mostly fills: clouds and the
+  full-screen body glow), i.e. CPU-bound before this session. Drift is ~1 px/s, so the cloud layer
+  (sheet, layers, glow) is rendered into a `create_similar` surface and re-rendered only when the key
+  changes: size, weather dict/ts, drift snapped to whole pixels, sun elevation in 0.25° steps, body
+  position in px. Steady state now **18–33 ms/frame** (same harness, same scene, old code 123 ms).
+
+### Verified (drift)
+- Time-lapses (frame every 4 min, 5 m/s wind from the east): 60% low, a cloud slides over the sun
+  for ~15 min, then clear; 30% low, sun clear the whole 32 min; mid 40 + high 50, small clumps pass
+  the sun without hiding it; night 60%, a cloud drifts in and covers the moon.
+- 14 tests pass (band coverage share ≈ cover, cover change keeps existing slots); pyflakes clean.
+- Still open: overcast as a uniform deck; general cumulus stay near the horizon (only the band
+  reaches the sun's height).

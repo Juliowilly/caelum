@@ -26,7 +26,7 @@ from ..core.catalog import _CONSTELLATIONS
 from ..core.config import DEFAULT_CONFIG, load_config, save_config
 from ..core.i18n import _PHASE_NAMES, _day_name, _fmt_date, _t
 from ..core.sky import (
-    _clamp, _cloud_palette, _seg_dist, body_occluders, cloud_layers, get_facing,
+    _clamp, _cloud_palette, _seg_dist, cloud_layers, get_facing,
     moon_brightness, opaque_cover, set_facing, sky_color_adaptive, sky_to_screen,
     veil_transmission,
 )
@@ -40,6 +40,9 @@ from . import sandbox
 from .settings import SettingsDialog
 
 # ─── Window ───────────────────────────────────────────────────────────────────
+
+# Cloud drift across the view: degrees per second per m/s of surface wind
+_CLOUD_DRIFT = {'low': 0.020, 'mid': 0.012, 'high': 0.007}
 
 class SkyTracker(Gtk.Window):
 
@@ -73,6 +76,10 @@ class SkyTracker(Gtk.Window):
         self._cmp_r   = 46
         self._moonrise = self._moonset = None
         self._meteors  = []
+        # Cloud layers' scroll offsets (screen widths); start where the wind left them
+        self._drift   = {layer: time.time() / 600.0 * 0.618 % 4.0 for layer in _CLOUD_DRIFT}
+        self._drift_t = time.monotonic()
+        self._cloud_surf = self._cloud_key = None   # cached cloud layer (see _draw_clouds)
         self._hw_heading   = None   # live heading from hardware sensor (degrees)
         self._has_compass  = False
         self._compass_dev  = None   # IIO sysfs device path
@@ -1073,13 +1080,43 @@ class SkyTracker(Gtk.Window):
         cr.move_to(px + 10, py + ph - 7)
         cr.show_text(name)
 
+    def _advance_cloud_drift(self, clouds):
+        """
+        Scroll each cloud layer with the wind. Angular speed falls with height (higher clouds
+        are farther away); only the wind's sideways component, relative to the facing
+        direction, moves clouds across the view.
+        """
+        now = time.monotonic()
+        dt  = _clamp(now - self._drift_t, 0.0, 1.0)   # no jump after suspend
+        self._drift_t = now
+        wind_spd = max(clouds.get('wind_speed', 0.0), 1.5)   # winds aloft are rarely calm
+        wind_to  = (clouds.get('wind_dir', 0.0) + 180.0) % 360.0
+        side     = math.sin(math.radians(wind_to - get_facing()))
+        # Wind straight toward/away from you still shows some sideways movement
+        side     = math.copysign(max(abs(side), 0.25), side)
+        for layer, deg_per_ms in _CLOUD_DRIFT.items():
+            # degrees/s → screen widths/s (the panorama spans 240°)
+            self._drift[layer] += side * wind_spd * deg_per_ms / 240.0 * dt
+
     def _draw_clouds(self, cr, W, H, clouds, sun_el, body=None):
+        """
+        Clouds move about a pixel a second, so the layer is rendered into a cached surface
+        and only redrawn when it would visibly change (drift, weather, sun/moon position).
+        """
+        self._advance_cloud_drift(clouds)
+        # Drift snapped to whole pixels, so the cached image matches what would be drawn
+        drift = {k: round(v * W) / W for k, v in self._drift.items()}
+        key = (W, H, id(clouds), clouds.get('ts'), tuple(drift.values()), round(sun_el * 4),
+               tuple(round(v) for v in body) if body else None)
+        if key != self._cloud_key:
+            surf = cr.get_target().create_similar(cairo.Content.COLOR_ALPHA, W, H)
+            self._render_clouds(cairo.Context(surf), W, H, clouds, sun_el, body, drift)
+            self._cloud_surf, self._cloud_key = surf, key
+        cr.set_source_surface(self._cloud_surf, 0, 0)
+        cr.paint()
+
+    def _render_clouds(self, cr, W, H, clouds, sun_el, body, drift):
         top_col, dark_col, cir_col = _cloud_palette(sun_el)
-        today = datetime.date.today()
-        hour  = datetime.datetime.now().hour
-        rng_d = random.Random(today.toordinal())
-        slot  = today.toordinal() * 24 + hour
-        rng_h = random.Random(slot)
 
         low_cov, mid_cov, high_cov = cloud_layers(clouds)
         wmo = clouds.get('wmo', 0)
@@ -1089,18 +1126,14 @@ class SkyTracker(Gtk.Window):
         if opaque > 65:
             _draw_overcast_sheet(cr, W, H, opaque, top_col, dark_col)
 
-        # Does a cloud sit in front of the sun/moon this hour? Chance = that layer's cover.
-        # Otherwise the disc is kept clear: broken cloud doesn't dim the whole sky.
-        covered = body_occluders(clouds, slot) if body else set()
-        avoid   = body
-        pos     = body[:2] if body else None
-
-        # Back-to-front: cirrus → altocumulus → cumulus
-        draw_cirrus(     cr, W, H, high_cov, cir_col,                    rng_d)
-        draw_altocumulus(cr, W, H, mid_cov,  top_col,                    rng_h,
-                         avoid=avoid, cover=pos if 'mid' in covered else None)
-        draw_cumulus(    cr, W, H, low_cov,  top_col, dark_col, rng_h, wmo=wmo,
-                         avoid=avoid, cover=pos if 'low' in covered else None)
+        # Back-to-front: cirrus → altocumulus → cumulus. A band of clouds drifts past the
+        # sun/moon, hiding it for the share of time given by the cover; the rest of the
+        # time it is clear: broken cloud doesn't dim the whole sky.
+        pos = body[:2] if body else None
+        draw_cirrus(     cr, W, H, high_cov, cir_col,           drift=drift['high'])
+        draw_altocumulus(cr, W, H, mid_cov,  top_col,           drift=drift['mid'], body=body)
+        draw_cumulus(    cr, W, H, low_cov,  top_col, dark_col, wmo=wmo,
+                         drift=drift['low'], body=body)
 
         # Celestial body glow: illuminates clouds around sun/moon position
         if pos:
