@@ -27,7 +27,7 @@ _WS_EX_TOOLWINDOW, _WS_EX_NOACTIVATE, _WS_EX_APPWINDOW = 0x80, 0x08000000, 0x400
 _WS_EX_LAYERED, _LWA_ALPHA = 0x80000, 0x2
 _SWP_NOSIZE, _SWP_NOZORDER = 0x1, 0x4
 _SWP_NOACTIVATE, _SWP_SHOWWINDOW, _SWP_FRAMECHANGED = 0x10, 0x40, 0x20
-_HWND_BOTTOM = 1
+_HWND_TOP, _HWND_BOTTOM = 0, 1
 _RGN_OR = 2
 _GW_HWNDNEXT, _GW_HWNDPREV = 2, 3
 _SMTO_NORMAL = 0
@@ -105,8 +105,11 @@ def _icon_layer():
     user32.SendMessageTimeoutW(progman, 0x052C, 0xD, 0x1, _SMTO_NORMAL, 1000, None)
     defview = user32.FindWindowExW(progman, None, 'SHELLDLL_DefView', None)
     if defview:
-        # Windows 11 24H2 and later: the icons are Progman's child; go just below them
-        return progman, defview
+        # Windows 11 24H2 and later: the icons and the wallpaper's WorkerW are both Progman's
+        # children, the WorkerW below the icons. A child of Progman itself isn't composited
+        # (Progman has no redirection surface); inside the WorkerW the sky covers the wallpaper
+        worker = user32.FindWindowExW(progman, None, 'WorkerW', None)
+        return (worker, None) if worker else (progman, defview)
     found = []
 
     def _probe(hwnd, _lparam):
@@ -261,9 +264,11 @@ class DesktopCanvas:
         user32.SetParent(self.hwnd, parent)
         x -= user32.GetSystemMetrics(_SM_XVIRTUALSCREEN)
         y -= user32.GetSystemMetrics(_SM_YVIRTUALSCREEN)
-        user32.SetWindowPos(self.hwnd, below or _HWND_BOTTOM, x, y, w, h,
+        # In a WorkerW: on top of its children; in Progman: just below the icons
+        user32.SetWindowPos(self.hwnd, below or _HWND_TOP, x, y, w, h,
                             _SWP_NOACTIVATE | _SWP_SHOWWINDOW | _SWP_FRAMECHANGED)
-        _log(self.hwnd, 'behind the icons (24H2 Progman)' if below else 'behind the icons (WorkerW)')
+        _log(self.hwnd, 'behind the icons (in Progman, below the icons)' if below
+             else 'behind the icons (in the WorkerW)')
         self._log_neighbours()
         return True
 

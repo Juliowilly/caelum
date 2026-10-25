@@ -1664,3 +1664,7 @@ auto-hide, scaled to GTK pixels).
   GDI drawing into the window, so frames now go in through UpdateLayeredWindow (a DIB section in a
   memory DC; Cairo's premultiplied ARGB32 is its format). CI: Settings is found with
   `[NullString]::Value` (PowerShell turns `$null` into "" for string parameters).
+- UpdateLayeredWindow run: no error, still the stock wallpaper. Progman itself has no redirection
+  surface, so its direct children aren't composited. On 24H2 the canvas now goes *inside* the
+  WorkerW that Progman holds below the icons (on top of the WorkerW's children). CI now compares a
+  screenshot from before the start with one after: the sky must change ≥ 60 % of a point grid.

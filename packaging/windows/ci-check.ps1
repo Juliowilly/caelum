@@ -31,6 +31,18 @@ function Shot($name) {
     $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
     [System.Drawing.Graphics]::FromImage($bmp).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
     $bmp.Save("$PWD\checks\$name.png")
+    return $bmp
+}
+
+# Share of a 20 x 15 grid of points (above the taskbar) that differ between two screenshots
+function Changed($x, $y) {
+    $n = 0
+    for ($i = 0; $i -lt 20; $i++) { for ($j = 0; $j -lt 15; $j++) {
+        $px = [int](($i + 0.5) * $work.Width / 20); $py = [int](($j + 0.5) * $work.Height / 15)
+        $p1, $p2 = $x.GetPixel($px, $py), $y.GetPixel($px, $py)
+        if ([math]::Abs($p1.R - $p2.R) + [math]::Abs($p1.G - $p2.G) + [math]::Abs($p1.B - $p2.B) -gt 30) { $n++ }
+    } }
+    return $n / 300
 }
 
 $cfgDir = "$env:APPDATA\caelum"
@@ -43,11 +55,16 @@ foreach ($mode in 'behind-icons', 'click-through-off') {
     (New-Object -ComObject Shell.Application).MinimizeAll()
     Start-Sleep -Seconds 2
     Set-Content "$cfgDir\config.json" "{`"click_through`": $ct, `"facing`": 180.0}"
+    $before = Shot "$mode-0"
     $p = Start-Process -FilePath $Exe -PassThru
     Start-Sleep -Seconds 25
-    Shot "$mode-1"
+    $s1 = Shot "$mode-1"
     Start-Sleep -Seconds 5
-    Shot "$mode-2"            # compared with -1: the sky must keep repainting
+    $null = Shot "$mode-2"
+    # The sky must cover most of the desktop it replaced
+    $covered = Changed $before $s1
+    Write-Output "${mode}: the sky changed $([int]($covered * 100)) % of the desktop"
+    if ($covered -lt 0.6) { $failed += "${mode}: sky not visible ($([int]($covered * 100)) % changed)" }
 
     # Compass (centre 62, 95 inside the work area): a click to the right of the centre faces east
     [Desk]::Click($work.Left + 62 + 30, $work.Top + 95)
