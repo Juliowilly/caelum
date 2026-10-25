@@ -1,3 +1,16 @@
+caelum (1.5.0-1) unstable; urgency=medium
+
+  * New upstream release 1.5.0.
+    - Rain and snow reworked: continuous falling layers behind and in front
+      of the landscape, wind slant, haze over the distance, rain shafts,
+      darker rain clouds and wet ground; lightning only for thunderstorms.
+    - Security: location detection over HTTPS (ipwho.is, ipapi.co fallback)
+      with validated replies; coordinates sent to online services rounded to
+      2 decimals; markup escaped; HTTPS-only requests with a size cap.
+    - Removed the obsolete phone-compass bridge script.
+
+ -- Juliowilly <jw.adamagaba@gmail.com>  Sun, 25 Oct 2026 13:04:32 +0000
+
 caelum (1.4.0-1) unstable; urgency=medium
 
   * New upstream release 1.4.0.

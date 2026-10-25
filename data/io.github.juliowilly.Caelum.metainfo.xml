@@ -40,23 +40,41 @@
   </supports>
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.4.0/data/screenshots/sunset.png</image>
+      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.5.0/data/screenshots/sunset.png</image>
       <caption>Sunset over a tree-lined plain with sunlit clouds, the moon and planets, and the weekly forecast</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.4.0/data/screenshots/night.png</image>
+      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.5.0/data/screenshots/night.png</image>
       <caption>A clear night with constellations, planets and the Milky Way</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.4.0/data/screenshots/day.png</image>
+      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.5.0/data/screenshots/rain.png</image>
+      <caption>Rain over the mountains: the distance fades into the downpour</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.5.0/data/screenshots/day.png</image>
       <caption>A partly cloudy morning sky over the desktop</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.4.0/data/screenshots/settings.png</image>
+      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.5.0/data/screenshots/settings.png</image>
       <caption>Settings: the Sky tab, with the opaque sky and the choice of landscape</caption>
     </screenshot>
   </screenshots>
   <releases>
+    <release version="1.5.0" date="2026-10-25">
+      <description>
+        <p>Realistic rain and snow, and safer network use.</p>
+        <ul>
+          <li>Rain falls continuously, behind and in front of the landscape, slanting with the real wind</li>
+          <li>Rain and snow hide the distance in a haze, darken the clouds and wet the ground</li>
+          <li>Grey rain shafts hang under passing showers</li>
+          <li>Lightning only during thunderstorms: the sky flashes while the landscape stays a silhouette</li>
+          <li>Bigger snowflakes that drift and sway</li>
+          <li>Location detection now uses an encrypted connection</li>
+          <li>Your coordinates are sent to the weather services rounded to about 1 km</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.4.0" date="2026-10-25">
       <description>
         <p>Real landscapes along the horizon.</p>

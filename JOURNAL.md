@@ -1092,7 +1092,7 @@ thick low cloud: 80% cirrus alone left the sun at ~33% and greyed the sky with t
 - **Next release**: rework the rain rendering, especially so it fits the landscapes and the new
   opaque background (the user's request).
 
-### Rain and snow reworked for the landscapes (unreleased)
+### Rain and snow reworked for the landscapes (released in 1.5.0)
 - **Request**: improve the rain, especially with the photo landscapes and the opaque sky.
 - **What was wrong** (renders of plain/mountains/sea at day, dusk, night, plus snow):
   - Rain was 1 px bluish ticks re-scattered at random 8 times a second, so it flickered rather than fell.
@@ -1129,7 +1129,7 @@ thick low cloud: 80% cirrus alone left the sun at ~33% and greyed the sky with t
 - `precip_intensity` and `rain_slant` live in `core/sky.py` so they can be tested without cairo.
   The old `_draw_rain` is gone. 4 new tests (38 in total); pyflakes clean.
 
-### Security review and fixes (unreleased)
+### Security review and fixes (released in 1.5.0)
 - **Question**: does the app put its users at risk? I reviewed every network call, file write,
   D-Bus/device access and the packaging permissions.
 - **Already sound**:
@@ -1161,3 +1161,10 @@ thick low cloud: 80% cirrus alone left the sun at ~33% and greyed the sky with t
   7. README: services listed, plus a Privacy note (HTTPS only, 2-decimal coordinates, no statistics).
 - 7 new tests (`tests/test_net.py`): rounding, HTTP refused, both geo-IP parsers and their
   rejections. 45 pass; pyflakes clean.
+
+### Release 1.5.0 (2026-10-25)
+- The rain/snow rework and the security fixes.
+- New store screenshot `rain.png`: mountains, 3 mm/h, wind across the view, forecast column shown.
+  Rendered off-screen like the 1.4.0 ones. Other screenshots unchanged; URLs pinned to `v1.5.0`.
+- Version bump: `__init__.py`, `debian/changelog` 1.5.0-1, metainfo release notes.
+- First release with `SHA256SUMS` among the assets (`make checksums`).
