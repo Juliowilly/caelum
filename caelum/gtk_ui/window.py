@@ -5,6 +5,7 @@ import glob
 import math
 import os
 import random
+import sys
 import threading
 import time
 
@@ -264,7 +265,10 @@ class SkyTracker(Gtk.Window):
         self.connect('key-press-event', self._on_key)
         self.connect('button-press-event', self._on_click)
 
+        self._win32 = None
         self.show_all()
+        if sys.platform == 'win32':
+            self._setup_windows_desktop()
         GLib.idle_add(self._force_fullscreen)
         GLib.timeout_add(500, self._force_fullscreen)
 
@@ -275,7 +279,65 @@ class SkyTracker(Gtk.Window):
             geo = monitor.get_geometry()
             self.move(geo.x, geo.y)
             self.resize(geo.width, geo.height)
+        if self._win32:
+            self._place_on_desktop()
         return False
+
+    # ── Windows desktop ──────────────────────────────────────────────────────
+
+    def _setup_windows_desktop(self):
+        """Windows has no desktop window type: the sky goes behind the icons (see win32.py),
+        and a tray icon opens Settings, since the gear can't be clicked there."""
+        import atexit
+        from . import win32
+        self._win32        = win32
+        self._placed_for   = None    # click_through value the window was placed for
+        self._behind_icons = False
+        self._tray         = self._make_tray()
+        atexit.register(self._leave_desktop)
+
+    def _place_on_desktop(self):
+        want = self.cfg.get('click_through', True)
+        self._placed_for = want
+        try:
+            behind = self._win32.place_sky(self._win32.hwnd_of(self.get_window()), want)
+        except Exception as e:
+            print(f'Caelum: could not place the sky on the desktop: {e}', file=sys.stderr)
+            return
+        if self._behind_icons and not behind:
+            self._win32.restore_desktop()
+        self._behind_icons = behind
+
+    def _leave_desktop(self):
+        """On exit: take the sky off the icon layer so the user's wallpaper shows again."""
+        if self._behind_icons:
+            self.hide()
+            self._win32.restore_desktop()
+            self._behind_icons = False
+
+    def _make_tray(self):
+        tray  = Gtk.StatusIcon()
+        icons = Gtk.Window.get_default_icon_list()
+        if icons:
+            tray.set_from_pixbuf(icons[0])
+        else:
+            tray.set_from_icon_name('weather-clear')
+        tray.set_tooltip_text('Caelum')
+        tray.connect('activate', lambda _i: self._open_settings())
+        tray.connect('popup-menu', self._on_tray_menu)
+        return tray
+
+    def _on_tray_menu(self, tray, button, when):
+        menu = Gtk.Menu()
+        for label, action in ((_t('Settings'), self._open_settings),
+                              (_t('Clean Mode  (Ctrl+H)'), self._toggle_clean),
+                              (_t('Quit Caelum'), Gtk.main_quit)):
+            item = Gtk.MenuItem(label=label)
+            item.connect('activate', lambda _m, a=action: a())
+            menu.append(item)
+        menu.show_all()
+        self._tray_menu = menu    # keep it alive while it is open
+        menu.popup(None, None, Gtk.StatusIcon.position_menu, tray, button, when)
 
     # ── Day data ─────────────────────────────────────────────────────────────
 
@@ -498,9 +560,7 @@ class SkyTracker(Gtk.Window):
         ctrl = ev.state & Gdk.ModifierType.CONTROL_MASK
         k    = ev.keyval
         if ctrl and k in (ord('h'), ord('H')):
-            self.cfg['clean_mode'] = not self.cfg.get('clean_mode', False)
-            save_config(self.cfg)
-            self.da.queue_draw()
+            self._toggle_clean()
             return True
         if ctrl and k in (ord('s'), ord('S')):
             self._open_settings()
@@ -513,6 +573,11 @@ class SkyTracker(Gtk.Window):
             self.da.queue_draw()
             return True
         return False
+
+    def _toggle_clean(self):
+        self.cfg['clean_mode'] = not self.cfg.get('clean_mode', False)
+        save_config(self.cfg)
+        self.da.queue_draw()
 
     def _on_click(self, _w, ev):
         if math.hypot(ev.x - self._gear_cx, ev.y - self._gear_cy) <= 20:
@@ -596,6 +661,8 @@ class SkyTracker(Gtk.Window):
         """Click-through: the window takes input only on its controls, so clicks on the sky
         reach the desktop icons and windows below. Without it the whole screen is hit-testable."""
         cfg = self.cfg
+        if self._win32 and self._placed_for not in (None, cfg.get('click_through', True)):
+            self._place_on_desktop()   # the switch moves the sky behind or in front of the icons
         if not cfg.get('click_through', True) or self._exploring():
             rects = None
         else:

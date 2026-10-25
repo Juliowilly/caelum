@@ -1,5 +1,6 @@
 """Settings dialog."""
 
+import sys
 import threading
 
 import gi
@@ -226,6 +227,8 @@ class SettingsDialog(Gtk.Window):
         photos.set_name(_t('Photos (JPEG, PNG)'))
         photos.add_mime_type('image/jpeg')
         photos.add_mime_type('image/png')
+        for pattern in ('*.jpg', '*.jpeg', '*.png'):   # the Windows dialog only knows patterns
+            photos.add_pattern(pattern)
         chooser.add_filter(photos)
         chooser.connect('response', self._on_photo_chosen)
         self._chooser = chooser               # keep it alive until it answers
@@ -471,7 +474,7 @@ class SettingsDialog(Gtk.Window):
         _row(lb, _t('Compass sensor'), self._cmp_status_lbl)
 
         self._e_compass_port = Gtk.Entry()
-        self._e_compass_port.set_placeholder_text('/dev/ttyUSB0')
+        self._e_compass_port.set_placeholder_text('COM3' if sys.platform == 'win32' else '/dev/ttyUSB0')
         self._e_compass_port.set_text(self.cfg.get('compass_port', ''))
         self._e_compass_port.set_hexpand(True)
         conn_btn = Gtk.Button(label=_t('Connect'))
@@ -497,7 +500,7 @@ class SettingsDialog(Gtk.Window):
         sw_as = Gtk.Switch()
         sw_as.set_active(autostart_enabled())
         sw_as.connect('notify::active', lambda s, p: set_autostart(s.get_active()))
-        _row(lb, _t('Start with GNOME session'), sw_as)
+        _row(lb, _t('Start when you sign in' if sys.platform == 'win32' else 'Start with GNOME session'), sw_as)
 
         lb = _group(page, _t('Wallpaper'))
         sw_wp = Gtk.Switch()

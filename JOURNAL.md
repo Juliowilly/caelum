@@ -1533,3 +1533,40 @@ On Windows, the Linux-only parts must be replaced or turned off:
 
 The packaging route (e.g. GTK3/PyGObject via MSYS2 plus an installer) is to be chosen with the
 user first.
+
+---
+
+## Session 14 — Windows package (2026-10-25)
+
+The user asked whether Caelum can go on the Microsoft Store: yes, as an MSIX (Microsoft signs and
+hosts it for free) or an EXE/MSI (own code-signing certificate). Plan agreed: (1) PyInstaller
+build of the GTK app from MSYS2, tested by hand; (2) MSIX for the Store plus a zip on GitHub
+Releases; (3) built on GitHub Actions. This session: step 1, on the `windows` branch.
+
+### Step 1: Windows code paths and a CI test build (unreleased)
+
+- `caelum/gtk_ui/win32.py` (ctypes, Windows only):
+  - **Sky behind the desktop icons**, as live-wallpaper apps do: Progman's message 0x052C creates
+    the WorkerW between the wallpaper and the icons, and the sky becomes its child. On Windows 11
+    24H2+ the icons (SHELLDLL_DefView) sit inside Progman: the sky becomes Progman's child, just
+    below the icons. Click-through off, or no icon layer found → a bottom-most window over the
+    icons that takes clicks. Either way: no taskbar button, and a click doesn't raise it.
+  - On exit the user's own wallpaper is re-applied so the icon layer isn't left with the sky.
+  - Wallpaper export → `SystemParametersInfoW` (background only; no lock-screen API for desktop
+    apps). Autostart → the per-user `Run` registry key.
+  - Folders: config in `%APPDATA%\caelum`, landscapes and cache in `%LOCALAPPDATA%`.
+- Window: a tray icon (Settings, Clean mode, Quit), since the gear can't be clicked behind the
+  icons. The Click-through switch moves the sky in front of or behind the icons at once.
+- i18n: Windows has no LANG; the display language comes from `GetUserDefaultUILanguage`.
+  New strings ("Start when you sign in", "Settings", "Quit Caelum") in fr/es/de/pt/it.
+- Settings: the photo chooser also filters by pattern (the Windows dialog ignores MIME types);
+  serial port placeholder `COM3`.
+- Linux behaviour unchanged; the IIO and D-Bus compasses simply find nothing on Windows.
+- Packaging: `packaging/windows/` (launcher, PyInstaller spec, build.sh), one folder (not one
+  file: faster start, fewer antivirus false alarms). The launcher points OpenSSL at the bundled
+  certificates and logs to `%LOCALAPPDATA%\caelum\caelum.log`. `caelum.exe --selftest <file>`
+  checks GTK, Cairo and HTTPS (with a neutral place, Paris).
+- `.github/workflows/windows.yml`: MSYS2 UCRT64, unit tests, build, self-test, 30 s launch with a
+  screenshot; the zip and the checks are kept as run artifacts.
+- Not tested yet on a real Windows desktop: the icon-layer placement is undocumented Windows
+  behaviour and needs the user's test on Windows 10/11.

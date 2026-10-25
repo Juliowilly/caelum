@@ -1,4 +1,4 @@
-"""GNOME session autostart entry."""
+"""Start at login: a GNOME session autostart entry (the Run key on Windows)."""
 
 import os
 import shutil
@@ -24,6 +24,10 @@ def _launch_lines():
 
 # Inside a snap HOME is ~/snap/caelum/<rev>, which is where snapd looks for autostart entries
 def set_autostart(enabled):
+    if sys.platform == 'win32':
+        from . import win32
+        win32.set_autostart(enabled)
+        return
     if sandbox.kind() == 'flatpak':
         sandbox.flatpak_set_autostart(enabled)
         return
@@ -39,6 +43,9 @@ def set_autostart(enabled):
         os.remove(_AUTOSTART_PATH)
 
 def autostart_enabled():
+    if sys.platform == 'win32':
+        from . import win32
+        return win32.autostart_enabled()
     if sandbox.kind() == 'flatpak':
         return sandbox.flatpak_autostart_enabled()
     return os.path.exists(_AUTOSTART_PATH)

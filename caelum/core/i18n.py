@@ -1,6 +1,7 @@
 """Translations and localised date helpers."""
 
 import os
+import sys
 
 # ─── i18n ─────────────────────────────────────────────────────────────────────
 
@@ -50,6 +51,9 @@ _TRANSLATIONS = {
         'sunrise_in':  'Lever dans {h}h {m:02d}m',
         'Sky Overlay Active': 'Overlay Actif',
         'Start with GNOME session': 'Démarrer avec GNOME',
+        'Start when you sign in': "Démarrer à l'ouverture de session",
+        'Settings': 'Paramètres',
+        'Quit Caelum': 'Quitter Caelum',
         'Aster Size': 'Taille des Astres',
         'Astronomical Info Cards': 'Infos Astronomiques',
         'Visible Cards': 'Cartes Visibles',
@@ -176,6 +180,9 @@ _TRANSLATIONS = {
         'sunrise_in':  'Amanecer en {h}h {m:02d}m',
         'Sky Overlay Active': 'Overlay Activo',
         'Start with GNOME session': 'Iniciar con GNOME',
+        'Start when you sign in': 'Iniciar al abrir sesión',
+        'Settings': 'Ajustes',
+        'Quit Caelum': 'Salir de Caelum',
         'Aster Size': 'Tamaño de Astros',
         'Astronomical Info Cards': 'Info Astronómica',
         'Visible Cards': 'Tarjetas Visibles',
@@ -302,6 +309,9 @@ _TRANSLATIONS = {
         'sunrise_in':  'Sonnenaufgang in {h}h {m:02d}m',
         'Sky Overlay Active': 'Overlay Aktiv',
         'Start with GNOME session': 'Mit GNOME starten',
+        'Start when you sign in': 'Bei der Anmeldung starten',
+        'Settings': 'Einstellungen',
+        'Quit Caelum': 'Caelum beenden',
         'Aster Size': 'Gestirngröße',
         'Astronomical Info Cards': 'Astro-Infokarten',
         'Visible Cards': 'Sichtbare Karten',
@@ -428,6 +438,9 @@ _TRANSLATIONS = {
         'sunrise_in':  'Nascer em {h}h {m:02d}m',
         'Sky Overlay Active': 'Overlay Ativo',
         'Start with GNOME session': 'Iniciar com GNOME',
+        'Start when you sign in': 'Iniciar ao entrar na sessão',
+        'Settings': 'Configurações',
+        'Quit Caelum': 'Sair do Caelum',
         'Aster Size': 'Tamanho dos Astros',
         'Astronomical Info Cards': 'Info Astronómica',
         'Visible Cards': 'Cartões Visíveis',
@@ -554,6 +567,9 @@ _TRANSLATIONS = {
         'sunrise_in':  'Alba in {h}h {m:02d}m',
         'Sky Overlay Active': 'Overlay Attivo',
         'Start with GNOME session': 'Avvia con GNOME',
+        'Start when you sign in': "Avvia all'accesso",
+        'Settings': 'Impostazioni',
+        'Quit Caelum': 'Esci da Caelum',
         'Aster Size': 'Dimensione Astri',
         'Astronomical Info Cards': 'Info Astronomiche',
         'Visible Cards': 'Schede Visibili',
@@ -676,6 +692,14 @@ def _detect_system_lang():
         val = os.environ.get(var)
         if val:
             code = val.split(':')[0].split('_')[0].split('.')[0].lower()
+            return code if code in _TRANSLATIONS else 'en'
+    if sys.platform == 'win32':
+        # Windows sets no LANG: ask for the display language, e.g. 'fr-FR'
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        buf = ctypes.create_unicode_buffer(85)
+        if kernel32.LCIDToLocaleName(kernel32.GetUserDefaultUILanguage(), buf, len(buf), 0):
+            code = buf.value.split('-')[0].lower()
             return code if code in _TRANSLATIONS else 'en'
     return 'en'
 

@@ -11,9 +11,12 @@ from .. import __version__  # noqa: E402
 from .window import SkyTracker  # noqa: E402
 
 APP_ID = 'io.github.juliowilly.Caelum'
-# Icon in the source checkout; installed packages get it from the icon theme instead
-_SOURCE_ICON = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-                            'data', f'{APP_ID}.svg')
+# Icon in the source checkout (and the Windows build); installed Linux packages get it from the
+# icon theme instead
+_DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                         'data')
+# The Windows build ships the PNG only (no SVG loader there)
+_SOURCE_ICONS = [os.path.join(_DATA_DIR, f'{APP_ID}{ext}') for ext in ('.svg', '-512.png')]
 
 
 def _set_app_identity():
@@ -23,11 +26,14 @@ def _set_app_identity():
     GLib.set_application_name('Caelum')
     if Gtk.IconTheme.get_default().has_icon(APP_ID):
         Gtk.Window.set_default_icon_name(APP_ID)
-    elif os.path.exists(_SOURCE_ICON):
-        try:
-            Gtk.Window.set_default_icon_from_file(_SOURCE_ICON)
-        except GLib.Error:
-            pass
+        return
+    for path in _SOURCE_ICONS:
+        if os.path.exists(path):
+            try:
+                Gtk.Window.set_default_icon_from_file(path)
+                return
+            except GLib.Error:
+                pass
 
 
 def main(argv=None):

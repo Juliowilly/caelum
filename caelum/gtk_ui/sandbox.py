@@ -1,4 +1,4 @@
-"""Sandbox awareness: plain install (.deb / pip / source) vs Snap vs Flatpak.
+"""Sandbox awareness: plain install (.deb / pip / source) vs Snap vs Flatpak (and Windows).
 
 Inside Flatpak the host's dconf and ~/.config/autostart are out of reach, so wallpaper and
 autostart go through the XDG desktop portals instead. Snap allows dconf writes through its
@@ -6,6 +6,7 @@ autostart go through the XDG desktop portals instead. Snap allows dconf writes t
 """
 
 import os
+import sys
 
 from gi.repository import Gio, GLib
 
@@ -61,6 +62,9 @@ def data_dir():
     if kind() == 'snap':
         # Revision-independent, so the files survive snap refreshes
         return os.path.join(os.environ['SNAP_USER_COMMON'], '.local', 'share')
+    if sys.platform == 'win32':
+        from . import win32
+        return win32.data_home()
     return os.environ.get('XDG_DATA_HOME') or os.path.expanduser('~/.local/share')
 
 
@@ -68,6 +72,9 @@ def cache_dir():
     if kind() == 'snap':
         # Revision-independent, so the wallpaper path survives snap refreshes
         return os.path.join(os.environ['SNAP_USER_COMMON'], '.cache')
+    if sys.platform == 'win32':
+        from . import win32
+        return os.path.join(win32.data_home(), 'caelum', 'cache')
     return os.environ.get('XDG_CACHE_HOME') or os.path.expanduser('~/.cache')
 
 
@@ -83,6 +90,11 @@ def set_wallpaper(path, mode):
 
     mode: 'background' | 'lockscreen' | 'both'. Call from the main thread.
     """
+    if sys.platform == 'win32':
+        if mode in ('background', 'both'):
+            from . import win32
+            win32.set_wallpaper(path)
+        return
     if kind() == 'flatpak':
         with open(path, 'rb') as f:
             fds = Gio.UnixFDList.new_from_array([os.dup(f.fileno())])

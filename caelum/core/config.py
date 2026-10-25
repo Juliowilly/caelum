@@ -1,13 +1,17 @@
-"""Configuration: defaults, load/save (XDG config dir)."""
+"""Configuration: defaults, load/save (XDG config dir; %APPDATA% on Windows)."""
 
 import json
 import os
 import shutil
+import sys
 
 from .i18n import _set_lang
 
-_CONFIG_DIR = os.path.join(os.environ.get('XDG_CONFIG_HOME') or os.path.expanduser('~/.config'),
-                           'caelum')
+if sys.platform == 'win32':
+    _CONFIG_HOME = os.environ.get('APPDATA') or os.path.expanduser('~\\AppData\\Roaming')
+else:
+    _CONFIG_HOME = os.environ.get('XDG_CONFIG_HOME') or os.path.expanduser('~/.config')
+_CONFIG_DIR = os.path.join(_CONFIG_HOME, 'caelum')
 CONFIG_PATH = os.path.join(_CONFIG_DIR, 'config.json')
 # Before packaging, config.json lived next to desktop_tracker.py in the source checkout
 _LEGACY_CONFIG_PATH = os.path.join(

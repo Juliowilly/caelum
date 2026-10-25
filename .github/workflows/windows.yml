@@ -1,0 +1,77 @@
+# Windows test build: GTK3 + PyGObject from MSYS2, bundled by PyInstaller into a zip.
+# Each run checks the bundle (--selftest), starts Caelum for 30 s and keeps a screenshot.
+name: Windows build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master, windows]
+    paths:
+      - 'caelum/**'
+      - 'data/**'
+      - 'tests/**'
+      - 'packaging/windows/**'
+      - '.github/workflows/windows.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: zip
+          pacboy: >-
+            gtk3:p python-gobject:p python-cairo:p python-pyserial:p
+            pyinstaller:p pyinstaller-hooks-contrib:p python-pillow:p ca-certificates:p
+
+      - name: Unit tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Build
+        run: packaging/windows/build.sh
+
+      - name: Self-test the bundle
+        run: |
+          dist/caelum/caelum.exe --selftest selftest.txt || status=$?
+          cat selftest.txt
+          exit ${status:-0}
+
+      - name: Start Caelum and take a screenshot
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath dist\caelum\caelum.exe -PassThru
+          Start-Sleep -Seconds 30
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+          [System.Drawing.Graphics]::FromImage($bmp).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+          $bmp.Save("$PWD\screenshot.png")
+          $log = "$env:LOCALAPPDATA\caelum\caelum.log"
+          if (Test-Path $log) { Copy-Item $log caelum.log; Get-Content $log }
+          if ($p.HasExited) { throw "Caelum exited after start (code $($p.ExitCode))" }
+          Stop-Process -Id $p.Id
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: caelum-windows-x64
+          path: dist/caelum-*-windows-x64.zip
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: checks
+          path: |
+            selftest.txt
+            screenshot.png
+            caelum.log
