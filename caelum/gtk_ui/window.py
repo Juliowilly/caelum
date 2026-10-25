@@ -51,7 +51,8 @@ _LOW_WIND_FACTOR = 1.5
 
 # Weather refresh intervals (s). Kept on the wall clock: GLib timers use the monotonic clock,
 # which stops during suspend/hibernate, so a 1 h timer would still wait ~1 h after resume.
-_REFRESH = {'om': 15 * 60, 'met': 60 * 60, 'obs': 10 * 60}   # radar frames every 5–10 min, airports 30–60
+# radar frames every 5–10 min, airports 30–60; Settings → About states these intervals
+_REFRESH = {'om': 15 * 60, 'met': 60 * 60, 'obs': 10 * 60}
 _RETRY   = (15, 30, 60, 120, 300)   # back-off after a failed fetch (s)
 _SLEPT   = 60   # wall time the monotonic clock missed beyond this → the system was asleep
 # Explore mode (click-through on): seconds without pointer motion before the sky lets clicks through again

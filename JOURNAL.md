@@ -1381,3 +1381,7 @@ Done (B):
   - lockscreen → **off**: it never showed anything, and turning it into 'both' would take over the
     user's desktop wallpaper unasked.
 - tests/test_config.py: the migrations. 77 tests pass.
+- Settings → System → About → Weather now reads "Observations every 10 min · forecasts every
+  15 min (Open-Meteo) and 1 h (MET Norway)". It was hard-coded English and didn't mention
+  observations. Now translated into fr/es/de/pt/it; a comment at `_REFRESH` points to it. Checked
+  in German, the longest: it wraps cleanly.

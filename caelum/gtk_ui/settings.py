@@ -380,7 +380,7 @@ class SettingsDialog(Gtk.Window):
         version = Gtk.Label(label=__version__, xalign=1)
         version.set_selectable(True)
         _row(lb, 'Caelum', version)
-        _row(lb, _t('Weather'), None, 'Open-Meteo every 15 min · MET Norway every 1 h')
+        _row(lb, _t('Weather'), None, _t('Observations every 10 min · forecasts every 15 min (Open-Meteo) and 1 h (MET Norway)'))
 
     def _on_lang_changed(self, combo):
         code = combo.get_active_id() or 'auto'
