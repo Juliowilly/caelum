@@ -242,7 +242,9 @@ class SkyTracker(Gtk.Window):
     def _setup_window(self):
         screen = self.get_screen()
         visual = screen.get_rgba_visual()
-        if visual:
+        # Windows draws see-through GTK windows as layered windows, which show nothing once the
+        # sky is a child of the desktop's icon layer
+        if visual and sys.platform != 'win32':
             self.set_visual(visual)
         self.set_app_paintable(True)
         self.set_decorated(False)

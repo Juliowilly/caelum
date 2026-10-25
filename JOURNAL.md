@@ -1570,3 +1570,9 @@ Releases; (3) built on GitHub Actions. This session: step 1, on the `windows` br
   screenshot; the zip and the checks are kept as run artifacts.
 - Not tested yet on a real Windows desktop: the icon-layer placement is undocumented Windows
   behaviour and needs the user's test on Windows 10/11.
+- First CI run (Windows Server 2025, build 26100 = 24H2 base): 92 tests pass, self-test ok (GTK
+  3.24.52, cairo 1.18.6, HTTPS, 3 landscapes), Caelum ran 30 s with no error, zip 47 MB. But the
+  screenshot showed the stock wallpaper, no sky. Likely cause: GTK draws RGBA windows as layered
+  windows, which don't paint as a child of the icon layer. The sky window is now opaque on
+  Windows (the sky is opaque by default anyway), the placement is logged to caelum.log, and the
+  CI takes one screenshot behind the icons and one with click-through off.

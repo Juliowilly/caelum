@@ -136,12 +136,23 @@ def place_sky(hwnd, behind_icons):
         y -= user32.GetSystemMetrics(_SM_YVIRTUALSCREEN)
         user32.SetWindowPos(hwnd, below or _HWND_BOTTOM, x, y, w, h,
                             _SWP_NOACTIVATE | _SWP_SHOWWINDOW | _SWP_FRAMECHANGED)
+        _log(hwnd, 'behind the icons (24H2 Progman)' if below else 'behind the icons (WorkerW)')
         return True
     user32.SetParent(hwnd, None)
     user32.SetWindowLongPtrW(hwnd, _GWL_STYLE, (style | _WS_POPUP) & ~_WS_CHILD)
     user32.SetWindowPos(hwnd, _HWND_BOTTOM, x, y, w, h,
                         _SWP_NOACTIVATE | _SWP_SHOWWINDOW | _SWP_FRAMECHANGED)
+    _log(hwnd, 'bottom-most window' + ('' if not behind_icons else ' (no icon layer found)'))
     return False
+
+
+def _log(hwnd, where):
+    """One line in caelum.log: where the sky went, for bug reports from Windows users."""
+    r = wintypes.RECT()
+    user32.GetWindowRect(hwnd, ctypes.byref(r))
+    print(f'Caelum: sky placed {where}, {r.right - r.left}x{r.bottom - r.top} at '
+          f'({r.left}, {r.top}), visible={bool(user32.IsWindowVisible(hwnd))}',
+          file=sys.stderr, flush=True)
 
 
 def restore_desktop():

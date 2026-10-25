@@ -1,5 +1,6 @@
 # Windows test build: GTK3 + PyGObject from MSYS2, bundled by PyInstaller into a zip.
-# Each run checks the bundle (--selftest), starts Caelum for 30 s and keeps a screenshot.
+# Each run checks the bundle (--selftest), starts Caelum behind and in front of
+# the desktop icons and keeps a screenshot of each.
 name: Windows build
 
 on:
@@ -46,20 +47,28 @@ jobs:
           cat selftest.txt
           exit ${status:-0}
 
-      - name: Start Caelum and take a screenshot
+      # Behind the icons (the default), then in front of them (click-through off)
+      - name: Start Caelum and take screenshots
         shell: pwsh
         run: |
-          $p = Start-Process -FilePath dist\caelum\caelum.exe -PassThru
-          Start-Sleep -Seconds 30
           Add-Type -AssemblyName System.Windows.Forms, System.Drawing
-          $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
-          $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
-          [System.Drawing.Graphics]::FromImage($bmp).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
-          $bmp.Save("$PWD\screenshot.png")
-          $log = "$env:LOCALAPPDATA\caelum\caelum.log"
-          if (Test-Path $log) { Copy-Item $log caelum.log; Get-Content $log }
-          if ($p.HasExited) { throw "Caelum exited after start (code $($p.ExitCode))" }
-          Stop-Process -Id $p.Id
+          $cfgDir = "$env:APPDATA\caelum"
+          New-Item -ItemType Directory -Force $cfgDir | Out-Null
+          foreach ($mode in 'behind-icons', 'click-through-off') {
+            $ct = if ($mode -eq 'behind-icons') { 'true' } else { 'false' }
+            Set-Content "$cfgDir\config.json" "{`"click_through`": $ct}"
+            $p = Start-Process -FilePath dist\caelum\caelum.exe -PassThru
+            Start-Sleep -Seconds 30
+            $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+            $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+            [System.Drawing.Graphics]::FromImage($bmp).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+            $bmp.Save("$PWD\screenshot-$mode.png")
+            $log = "$env:LOCALAPPDATA\caelum\caelum.log"
+            if (Test-Path $log) { Copy-Item $log "caelum-$mode.log"; Get-Content $log }
+            if ($p.HasExited) { throw "Caelum exited after start (code $($p.ExitCode))" }
+            Stop-Process -Id $p.Id
+            Start-Sleep -Seconds 3
+          }
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -73,5 +82,5 @@ jobs:
           name: checks
           path: |
             selftest.txt
-            screenshot.png
-            caelum.log
+            screenshot-*.png
+            caelum-*.log
