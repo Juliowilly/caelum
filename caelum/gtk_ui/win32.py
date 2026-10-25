@@ -1,11 +1,13 @@
 """Windows: the parts the Linux desktop does through GNOME, done through the Win32 API (ctypes).
 
 The sky goes behind the desktop icons the way live-wallpaper apps do it: Progman is asked to
-create the WorkerW window that sits between the wallpaper and the icons, and the sky window becomes
-its child. Windows 11 24H2 moved the icons (SHELLDLL_DefView) and the WorkerW inside Progman; there
-the sky becomes Progman's child, ordered just below the icons. Behind the icons the sky gets no
-clicks, so Settings and Quit live in a tray icon. With click-through off, the sky is a normal
-bottom-most window instead, over the icons, and takes every click.
+create the WorkerW window that sits between the wallpaper and the icons, and a window showing the
+sky becomes its child. Windows 11 24H2 moved the icons (SHELLDLL_DefView) and the WorkerW inside
+Progman; there the sky becomes Progman's child, ordered just below the icons. That window is a
+plain Win32 one (DesktopCanvas): a reparented GTK window never paints again. An invisible hit
+layer over the icons takes the clicks on the sky's controls; the tray icon opens Settings too.
+With click-through off, the GTK window itself sits over the icons, under every other window, and
+takes every click.
 
 Only imported on Windows.
 """
@@ -140,59 +142,151 @@ def _primary_rect():
     return r.left, r.top, r.right - r.left, r.bottom - r.top
 
 
-_layered_by_us = set()   # sky windows made layered here, not by GTK
-
-
 def primary_size():
     """Primary monitor (width, height) in the pixels this process sees."""
     return _primary_rect()[2:]
 
 
-def place_sky(hwnd, behind_icons):
-    """
-    Put the sky window behind the desktop icons, or (behind_icons False, or no icon layer found)
-    at the bottom of the normal windows. Returns True when it went behind the icons.
-    Only the position changes: GTK sizes the window itself, and paints at the size it asked for.
-    """
+def place_sky(hwnd):
+    """The GTK sky window over the desktop icons, under every other window (click-through off,
+    or no icon layer found). Only the position changes: GTK sizes the window and paints at the
+    size it asked for. Never SetParent a GTK window: it stops painting for good."""
     x, y, _w, _h = _primary_rect()
-    flags = _SWP_NOSIZE | _SWP_NOACTIVATE | _SWP_SHOWWINDOW | _SWP_FRAMECHANGED
     ex = user32.GetWindowLongPtrW(hwnd, _GWL_EXSTYLE)
-    # GTK paints through a layered window (UpdateLayeredWindow) unless GDK_WIN32_LAYERED=0 (app.py)
-    # turned that off; the bit is GTK's then, keep it
-    gtk_layered = bool(ex & _WS_EX_LAYERED) and hwnd not in _layered_by_us
     # Never in the taskbar or Alt+Tab, and a click doesn't raise it over the user's windows
     ex = (ex | _WS_EX_TOOLWINDOW | _WS_EX_NOACTIVATE) & ~_WS_EX_APPWINDOW
-    if not gtk_layered:
-        # Layered and fully opaque: 24H2's Progman is composited and only draws a layered child,
-        # and a plain bottom-most window didn't show either (Windows Server 2025 runner)
-        ex |= _WS_EX_LAYERED
-        _layered_by_us.add(hwnd)
-    if 'style' not in os.environ.get('CAELUM_WIN_SKIP', ''):   # TEMPORARY: CI bisection
-        user32.SetWindowLongPtrW(hwnd, _GWL_EXSTYLE, ex)
-    if hwnd in _layered_by_us:
-        user32.SetLayeredWindowAttributes(hwnd, 0, 255, _LWA_ALPHA)
-    style = user32.GetWindowLongPtrW(hwnd, _GWL_STYLE)
-    layer = _icon_layer() if behind_icons else None
-    if layer:
+    user32.SetWindowLongPtrW(hwnd, _GWL_EXSTYLE, ex)
+    _just_above_icons(hwnd, x, y, _SWP_NOSIZE | _SWP_NOACTIVATE | _SWP_SHOWWINDOW | _SWP_FRAMECHANGED)
+    _log(hwnd, 'over the icons')
+
+
+# ─── The sky behind the icons ────────────────────────────────────────────────
+
+_WM_PAINT, _WM_ERASEBKGND = 0x000F, 0x0014
+_SW_HIDE = 0
+_WNDPROC = ctypes.WINFUNCTYPE(_LONG_PTR, wintypes.HWND, wintypes.UINT, wintypes.WPARAM,
+                              wintypes.LPARAM)
+user32.DefWindowProcW.restype = _LONG_PTR
+user32.DefWindowProcW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+user32.CreateWindowExW.restype = wintypes.HWND
+user32.CreateWindowExW.argtypes = [wintypes.DWORD, wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.DWORD,
+                                   ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+                                   wintypes.HWND, wintypes.HMENU, wintypes.HINSTANCE, wintypes.LPVOID]
+user32.GetDC.restype = wintypes.HDC
+user32.GetDC.argtypes = [wintypes.HWND]
+user32.ReleaseDC.argtypes = [wintypes.HWND, wintypes.HDC]
+user32.BeginPaint.restype = wintypes.HDC
+user32.DestroyWindow.argtypes = [wintypes.HWND]
+user32.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
+gdi32.SetDIBitsToDevice.argtypes = [wintypes.HDC, ctypes.c_int, ctypes.c_int, wintypes.DWORD,
+                                    wintypes.DWORD, ctypes.c_int, ctypes.c_int, wintypes.UINT,
+                                    wintypes.UINT, ctypes.c_void_p, ctypes.c_void_p, wintypes.UINT]
+_kernel32 = ctypes.WinDLL('kernel32')
+_kernel32.GetModuleHandleW.restype = wintypes.HMODULE
+
+
+class _WNDCLASSEXW(ctypes.Structure):
+    _fields_ = [('cbSize', wintypes.UINT), ('style', wintypes.UINT), ('lpfnWndProc', _WNDPROC),
+                ('cbClsExtra', ctypes.c_int), ('cbWndExtra', ctypes.c_int),
+                ('hInstance', wintypes.HINSTANCE), ('hIcon', wintypes.HICON),
+                ('hCursor', wintypes.HANDLE), ('hbrBackground', wintypes.HBRUSH),
+                ('lpszMenuName', wintypes.LPCWSTR), ('lpszClassName', wintypes.LPCWSTR),
+                ('hIconSm', wintypes.HICON)]
+
+
+class _BITMAPINFOHEADER(ctypes.Structure):
+    _fields_ = [('biSize', wintypes.DWORD), ('biWidth', wintypes.LONG), ('biHeight', wintypes.LONG),
+                ('biPlanes', wintypes.WORD), ('biBitCount', wintypes.WORD),
+                ('biCompression', wintypes.DWORD), ('biSizeImage', wintypes.DWORD),
+                ('biXPelsPerMeter', wintypes.LONG), ('biYPelsPerMeter', wintypes.LONG),
+                ('biClrUsed', wintypes.DWORD), ('biClrImportant', wintypes.DWORD)]
+
+
+class _PAINTSTRUCT(ctypes.Structure):
+    _fields_ = [('hdc', wintypes.HDC), ('fErase', wintypes.BOOL), ('rcPaint', wintypes.RECT),
+                ('fRestore', wintypes.BOOL), ('fIncUpdate', wintypes.BOOL),
+                ('rgbReserved', ctypes.c_byte * 32)]
+
+
+user32.BeginPaint.argtypes = [wintypes.HWND, ctypes.POINTER(_PAINTSTRUCT)]
+user32.EndPaint.argtypes = [wintypes.HWND, ctypes.POINTER(_PAINTSTRUCT)]
+
+
+class DesktopCanvas:
+    """
+    A plain Win32 window behind the desktop icons that shows the sky's frames, rendered off screen
+    with Cairo (the frame's ARGB32 rows are the 32-bit top-down DIB that GDI copies as they are).
+    """
+    _CLASS = 'CaelumDesktopSky'
+
+    def __init__(self):
+        self._frame = None
+        self._proc = _WNDPROC(self._wndproc)    # keep a reference: Windows calls it
+        hinst = _kernel32.GetModuleHandleW(None)
+        wc = _WNDCLASSEXW(cbSize=ctypes.sizeof(_WNDCLASSEXW), lpfnWndProc=self._proc,
+                          hInstance=hinst, lpszClassName=self._CLASS)
+        user32.RegisterClassExW(ctypes.byref(wc))   # fails harmlessly if already registered
+        x, y, w, h = _primary_rect()
+        self.size = (w, h)
+        self.hwnd = user32.CreateWindowExW(_WS_EX_TOOLWINDOW | _WS_EX_NOACTIVATE | _WS_EX_LAYERED,
+                                           self._CLASS, 'Caelum sky', _WS_POPUP,
+                                           x, y, w, h, None, None, hinst, None)
+        if not self.hwnd:
+            raise ctypes.WinError(ctypes.get_last_error())
+        # Layered and fully opaque: 24H2's Progman is composited and only draws layered children
+        user32.SetLayeredWindowAttributes(self.hwnd, 0, 255, _LWA_ALPHA)
+
+    def place(self):
+        """Behind the icons; False when there is no icon layer to go behind."""
+        layer = _icon_layer()
+        if not layer:
+            return False
         parent, below = layer
-        user32.SetWindowLongPtrW(hwnd, _GWL_STYLE, (style | _WS_CHILD) & ~_WS_POPUP)
-        user32.SetParent(hwnd, parent)
+        x, y, w, h = _primary_rect()
+        style = user32.GetWindowLongPtrW(self.hwnd, _GWL_STYLE)
+        user32.SetWindowLongPtrW(self.hwnd, _GWL_STYLE, (style | _WS_CHILD) & ~_WS_POPUP)
+        user32.SetParent(self.hwnd, parent)
         x -= user32.GetSystemMetrics(_SM_XVIRTUALSCREEN)
         y -= user32.GetSystemMetrics(_SM_YVIRTUALSCREEN)
-        user32.SetWindowPos(hwnd, below or _HWND_BOTTOM, x, y, 0, 0, flags)
-        _log(hwnd, 'behind the icons (24H2 Progman)' if below else 'behind the icons (WorkerW)')
+        user32.SetWindowPos(self.hwnd, below or _HWND_BOTTOM, x, y, w, h,
+                            _SWP_NOACTIVATE | _SWP_SHOWWINDOW | _SWP_FRAMECHANGED)
+        _log(self.hwnd, 'behind the icons (24H2 Progman)' if below else 'behind the icons (WorkerW)')
         return True
-    skip = os.environ.get('CAELUM_WIN_SKIP', '')   # TEMPORARY: CI bisection
-    if 'parent' not in skip:
-        user32.SetParent(hwnd, None)
-    if 'wstyle' not in skip:
-        user32.SetWindowLongPtrW(hwnd, _GWL_STYLE, (style | _WS_POPUP) & ~_WS_CHILD)
-    if 'framechanged' in skip:
-        flags &= ~_SWP_FRAMECHANGED
-    if 'pos' not in skip:
-        _just_above_icons(hwnd, x, y, flags)
-    _log(hwnd, 'bottom-most window' + ('' if not behind_icons else ' (no icon layer found)'))
-    return False
+
+    def show(self, pixels, w, h, stride):
+        """Show a frame: Cairo ARGB32 pixels (a buffer of h rows of `stride` bytes)."""
+        self._frame = (bytes(pixels), w, h, stride)
+        hdc = user32.GetDC(self.hwnd)
+        try:
+            self._blit(hdc)
+        finally:
+            user32.ReleaseDC(self.hwnd, hdc)
+
+    def destroy(self):
+        user32.ShowWindow(self.hwnd, _SW_HIDE)
+        user32.DestroyWindow(self.hwnd)
+
+    def _blit(self, hdc):
+        if not self._frame:
+            return
+        data, w, h, stride = self._frame
+        bmi = _BITMAPINFOHEADER(biSize=ctypes.sizeof(_BITMAPINFOHEADER), biWidth=stride // 4,
+                                biHeight=-h, biPlanes=1, biBitCount=32)   # top-down, BI_RGB
+        gdi32.SetDIBitsToDevice(hdc, 0, 0, w, h, 0, 0, 0, h, data, ctypes.byref(bmi), 0)
+
+    def _wndproc(self, hwnd, msg, wparam, lparam):
+        try:
+            if msg == _WM_PAINT:
+                ps = _PAINTSTRUCT()
+                hdc = user32.BeginPaint(hwnd, ctypes.byref(ps))
+                self._blit(hdc)
+                user32.EndPaint(hwnd, ctypes.byref(ps))
+                return 0
+            if msg == _WM_ERASEBKGND:
+                return 1      # the next frame covers everything: no flash of the class brush
+        except Exception as e:
+            print(f'Caelum: desktop canvas: {e}', file=sys.stderr, flush=True)
+        return user32.DefWindowProcW(hwnd, msg, wparam, lparam)
 
 
 def _icons_top():

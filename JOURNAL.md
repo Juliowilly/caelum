@@ -1646,3 +1646,14 @@ auto-hide, scaled to GTK pixels).
   draws ~95 frames / 10 s and the compass click works; skipping the extended styles, or the tray
   and hit layer, changes nothing. So a call in place_sky stops GTK drawing. Next: SetParent, the
   WS_POPUP/WS_CHILD style, SetWindowPos, SWP_FRAMECHANGED one at a time.
+- Bisection result: **SetParent stops GTK drawing** (skipping it alone: ~92 frames / 10 s; the
+  styles, SetWindowPos and SWP_FRAMECHANGED are fine). Several "failed" compass clicks had hit the
+  runner's terminal, which covers the compass.
+- New design:
+  - Behind the icons, the sky is a plain Win32 window (`win32.DesktopCanvas`, own WndProc)
+    reparented into the icon layer. Each tick (10/s) Caelum renders the frame off screen with
+    Cairo, as the wallpaper export does, and copies the ARGB32 rows with SetDIBitsToDevice (WM_PAINT
+    repaints the last frame). The GTK sky window hides; the hit layer takes the controls' clicks.
+  - Click-through off: the GTK window itself, never reparented, over the icons.
+  - Bisection switches removed. CI minimises all windows first and finds Settings by a title built
+    from the em dash's code point.

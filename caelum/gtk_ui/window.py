@@ -90,6 +90,7 @@ class SkyTracker(Gtk.Window):
         self._input_rects        = ()     # input region last applied (see _update_input_region)
         self._explore_until      = 0.0    # monotonic deadline of explore mode (whole sky takes input)
         self._exporting          = False  # rendering the wallpaper/lock-screen image
+        self._canvas_size        = None   # (W, H) while rendering for the Windows desktop canvas
         self._landscapes         = {}     # name → Landscape (None if its files are missing)
         self._land_cache         = None   # (key, surface, y) of the relit landscape
         self._city_name          = None   # reverse-geocoded city name
@@ -300,10 +301,9 @@ class SkyTracker(Gtk.Window):
         self._placed_for   = None    # click_through value the window was placed for
         self._behind_icons = False
         self._win_scale    = 1.0     # Windows pixels per GTK pixel
-        skip = os.environ.get('CAELUM_WIN_SKIP', '').split(',')   # TEMPORARY: CI bisection
-        self._skip = skip
-        self._tray         = None if 'tray' in skip else self._make_tray()
-        self._hit          = None if 'hit' in skip else self._make_hit_layer()
+        self._canvas       = None    # win32.DesktopCanvas showing the sky behind the icons
+        self._tray         = self._make_tray()
+        self._hit          = self._make_hit_layer()
         GLib.timeout_add_seconds(5, self._update_insets)   # the taskbar can move or auto-hide
         self._frames = 0
         GLib.timeout_add_seconds(10, self._log_frames)
@@ -312,27 +312,52 @@ class SkyTracker(Gtk.Window):
         atexit.register(self._leave_desktop)
 
     def _place_on_desktop(self):
+        """
+        Click-through on: the sky behind the icons. GTK can't go there (after SetParent its window
+        never paints again), so frames are rendered off screen into a plain Win32 window
+        (win32.DesktopCanvas) and the GTK window hides; the hit layer takes the controls' clicks.
+        Click-through off, or no icon layer found: the GTK window itself, over the icons.
+        """
         want = self.cfg.get('click_through', True)
         self._placed_for = want
-        if 'place' in self._skip:
-            return
+        behind = False
         try:
-            behind = self._win32.place_sky(self._win32.hwnd_of(self.get_window()), want)
+            if want:
+                if self._canvas is None:
+                    self._canvas = self._win32.DesktopCanvas()
+                behind = self._canvas.place()
+            if behind:
+                self.hide()
+                self._hit.show_all()
+                self._win32.place_hit_layer(self._win32.hwnd_of(self._hit.get_window()))
+            else:
+                if self._canvas:
+                    self._canvas.destroy()
+                    self._canvas = None
+                self._hit.hide()
+                self.show()
+                self._win32.place_sky(self._win32.hwnd_of(self.get_window()))
         except Exception as e:
             print(f'Caelum: could not place the sky on the desktop: {e}', file=sys.stderr)
-            return
         if self._behind_icons and not behind:
             self._win32.restore_desktop()
         self._behind_icons = behind
-        if behind and self._hit:
-            self._hit.show_all()
-            self._win32.place_hit_layer(self._win32.hwnd_of(self._hit.get_window()))
-        elif self._hit:
-            self._hit.hide()
         self._input_rects = ()   # stale: set the click region again at the next draw
-        alloc = self.da.get_allocation()
-        print(f'Caelum: GTK draws {alloc.width}x{alloc.height}', file=sys.stderr, flush=True)
         self._update_insets()
+        if behind:
+            self._push_desktop_frame()
+
+    def _push_desktop_frame(self):
+        """Render one frame off screen and show it behind the icons."""
+        W, H = self._canvas.size
+        surf = cairo.ImageSurface(cairo.FORMAT_ARGB32, W, H)
+        self._canvas_size = (W, H)
+        try:
+            self._on_draw(self.da, cairo.Context(surf))
+        finally:
+            self._canvas_size = None
+        surf.flush()
+        self._canvas.show(surf.get_data(), W, H, surf.get_stride())
 
     def _update_insets(self):
         """Keep the gear, compass and forecast off the taskbar: the sky covers the whole screen."""
@@ -341,8 +366,9 @@ class SkyTracker(Gtk.Window):
         except Exception as e:
             print(f'Caelum: no taskbar edges: {e}', file=sys.stderr, flush=True)
             return True
-        width = self.da.get_allocation().width
-        k = width / screen_w if width > 1 and screen_w else 1.0   # Windows pixels → GTK pixels
+        # Windows pixels → GTK pixels (the desktop canvas draws in Windows pixels)
+        width = screen_w if self._behind_icons else self.da.get_allocation().width
+        k = width / screen_w if width > 1 and screen_w else 1.0
         self._win_scale = 1.0 / k
         insets = tuple(int(round(e * k)) for e in edges)
         if insets != self._insets:
@@ -355,7 +381,7 @@ class SkyTracker(Gtk.Window):
     def _leave_desktop(self):
         """On exit: take the sky off the icon layer so the user's wallpaper shows again."""
         if self._behind_icons:
-            self.hide()
+            self._canvas.destroy()
             self._win32.restore_desktop()
             self._behind_icons = False
 
@@ -431,7 +457,10 @@ class SkyTracker(Gtk.Window):
     def _tick(self):
         if datetime.date.today() != self._last_date:
             self._refresh_day()
-        self.da.queue_draw()
+        if self._win32 and self._behind_icons:
+            self._push_desktop_frame()
+        else:
+            self.da.queue_draw()
         return True
 
     # ── Weather ──────────────────────────────────────────────────────────────
@@ -785,7 +814,7 @@ class SkyTracker(Gtk.Window):
             self._frames += 1
         cfg   = self.cfg
         alloc = self.da.get_allocation()
-        W, H  = alloc.width, alloc.height
+        W, H  = self._canvas_size or (alloc.width, alloc.height)
 
         set_facing(float(self._hw_heading)
                    if self._hw_heading is not None
@@ -945,7 +974,7 @@ class SkyTracker(Gtk.Window):
 
     def _draw_sky(self, cr, W, H, sun_el, sun_az, clouds, m_bright, star_vis=1.0,
                   lat=DEFAULT_CONFIG['latitude'], lon=DEFAULT_CONFIG['longitude'], utc=None):
-        if self.cfg.get('opaque_sky', True) or self._exporting:
+        if self.cfg.get('opaque_sky', True) or self._exporting or self._canvas_size:
             # Paint the whole sky so the wallpaper doesn't show (the exported image always does)
             zen, hor, g_top, g_bot = opaque_sky(sun_el, clouds, m_bright)
             base = cairo.LinearGradient(0, 0, 0, H)

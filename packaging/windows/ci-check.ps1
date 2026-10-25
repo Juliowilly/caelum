@@ -1,5 +1,5 @@
 # CI check of the Windows build, on the runner's desktop: start Caelum behind the icons and in
-# front of them (each with GTK's layered painting off and on), take screenshots, and click its
+# front of them, take screenshots, and click its
 # controls as a user would (compass, gear, a tab of Settings). Screenshots and logs go to
 # checks\. Fails if a click had no effect.
 param([string]$Exe = 'dist\caelum\caelum.exe')
@@ -36,17 +36,15 @@ function Shot($name) {
 $cfgDir = "$env:APPDATA\caelum"
 New-Item -ItemType Directory -Force $cfgDir | Out-Null
 $failed = @()
-# TEMPORARY bisection: which Windows step stops GTK drawing (CAELUM_WIN_SKIP)
-$runs = @(@('click-through-off', 'parent'), @('click-through-off', 'wstyle'),
-          @('click-through-off', 'pos'), @('click-through-off', 'framechanged'),
-          @('click-through-off', 'parent,wstyle'))
-foreach ($run in $runs) {
-    $place, $env:CAELUM_WIN_SKIP = $run
-    $mode = "$place-skip-$($env:CAELUM_WIN_SKIP -replace ',', '+')"
-    $ct = if ($place -eq 'behind-icons') { 'true' } else { 'false' }
+$settingsTitle = "Caelum $([char]0x2014) Settings"
+foreach ($mode in 'behind-icons', 'click-through-off') {
+    $ct = if ($mode -eq 'behind-icons') { 'true' } else { 'false' }
+    # The runner's terminal covers the compass: show the bare desktop
+    (New-Object -ComObject Shell.Application).MinimizeAll()
+    Start-Sleep -Seconds 2
     Set-Content "$cfgDir\config.json" "{`"click_through`": $ct, `"facing`": 180.0}"
     $p = Start-Process -FilePath $Exe -PassThru
-    Start-Sleep -Seconds 22
+    Start-Sleep -Seconds 25
     Shot "$mode-1"
     Start-Sleep -Seconds 5
     Shot "$mode-2"            # compared with -1: the sky must keep repainting
@@ -61,7 +59,8 @@ foreach ($run in $runs) {
     # Gear (28 px in from the work area's bottom-right corner) opens Settings
     [Desk]::Click($work.Right - 28, $work.Bottom - 28)
     Start-Sleep -Seconds 4
-    $dlg = [Desk]::FindWindow($null, 'Caelum — Settings')
+    Shot "$mode-gear"
+    $dlg = [Desk]::FindWindow($null, $settingsTitle)
     if ($dlg -eq [IntPtr]::Zero) {
         $failed += "${mode}: gear click opened no Settings"
     } else {
