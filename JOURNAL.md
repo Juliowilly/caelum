@@ -911,3 +911,20 @@ thick low cloud: 80% cirrus alone left the sun at ~33% and greyed the sky with t
   A simulated 3 h sleep with the network down → both refetched, retry in 15 s, wallpaper exported. Network
   back → both fetched, next in 900/3600 s, exported again. Live 10 s run fetched real data with no failures.
   21 tests pass, pyflakes clean.
+
+### Click-through to the desktop (unreleased)
+- **Symptom** (user): with Caelum running you can't use the desktop (icons, right-click menu, drag & drop).
+- **Cause**: the overlay is a full-screen window that takes every click. GNOME on Wayland ignores the
+  `DESKTOP` type hint, so it is an ordinary window stacked above the DING desktop-icons window.
+- **Fix**: `SkyTracker._update_input_region` (called at the end of each draw) sets the window's input shape
+  with `Gtk.Widget.input_shape_combine_region`. Only these take input: the gear (44 px box), the compass
+  (manual mode only), and the weekly forecast day cards (not in clean mode). Every other click reaches
+  whatever is below. The region is reapplied only when the rects change. It works on X11 and on Wayland
+  (`wl_surface.set_input_region`).
+- **Trade-off**: constellation hover names and right-click-anywhere need input over the whole sky. New
+  setting **"Click Through to Desktop"** (`click_through`, default on; fr/es/de/pt strings). Turn it off
+  to get the old behaviour. Keyboard shortcuts work once Caelum has focus (click the gear, compass or a card).
+  The Settings hint and README no longer say "right-click".
+- **Verified**: live run with default config: 9 rects (gear, compass, 7 day cards). Clean mode → 2.
+  Switch off → region reset to the whole window. 21 tests pass, pyflakes clean. Whether clicks actually
+  pass through on the user's GNOME Wayland desktop is still **to be confirmed by the user**.

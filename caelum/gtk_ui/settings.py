@@ -207,6 +207,21 @@ class SettingsDialog(Gtk.Window):
         row.pack_end(sw_c, False, False, 0)
         box.pack_start(row, False, False, 2)
 
+        row_ct = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        l_ct   = Gtk.Label(label=_t('Click Through to Desktop'), xalign=0)
+        l_ct.set_hexpand(True)
+        l_ct.set_tooltip_text('Clicks on the sky reach the desktop icons and windows below; '
+                              'only the gear, compass and forecast cards respond. '
+                              'Turn off to hover constellation names.')
+        sw_ct = Gtk.Switch()
+        sw_ct.set_active(self.cfg.get('click_through', True))
+        sw_ct.connect('notify::active', lambda s, p: (
+            self.cfg.update({'click_through': s.get_active()}),
+            save_config(self.cfg), self.par.da.queue_draw()))
+        row_ct.pack_start(l_ct, True, True, 0)
+        row_ct.pack_end(sw_ct, False, False, 0)
+        box.pack_start(row_ct, False, False, 2)
+
         row2 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         l2   = Gtk.Label(label=_t('Constellation Lines'), xalign=0)
         l2.set_hexpand(True)
@@ -379,7 +394,7 @@ class SettingsDialog(Gtk.Window):
         box.pack_start(btn, False, False, 0)
 
         hint = Gtk.Label(xalign=0)
-        hint.set_markup('<small>Right-click or click the gear to reopen this dialog.\n'
+        hint.set_markup('<small>Click the gear to reopen this dialog.\n'
                         'Open-Meteo every 15 min · MET Norway every 1 h.</small>')
         hint.set_margin_top(4)
         box.pack_start(hint, False, False, 0)

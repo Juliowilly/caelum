@@ -16,7 +16,7 @@ A native desktop widget that turns your screen background into a live, photoreal
 - **Sun & Moon** — accurate positions via Meeus algorithms; moon shows correct crescent orientation for your latitude
 - **Planets** — Mercury, Venus, Mars, Jupiter, Saturn rendered with colour and Saturn's rings
 - **Stars** — 500-star catalog with twinkling, Milky Way band, shooting meteors, airglow
-- **Constellation lines** — 23 constellations with hover-to-name
+- **Constellation lines** — 23 constellations with hover-to-name (when click-through is off)
 - **Real-time weather** — cloud layers, rain, snow, rainbow from Open-Meteo + MET Norway (no API key needed)
 - **Weekly forecast** — accordion-style column; click a day to expand hourly slots
 - **Cairo-drawn weather icons** — no external image files
@@ -108,12 +108,14 @@ packaging/    build-deb.sh
 
 ## Configuration
 
-Right-click or click the gear button (bottom-right) to open Settings:
+Click the gear button (bottom-right) to open Settings:
 - Location (auto-detect or manual coordinates)
 - Timezone
 - Language
 - Facing direction (or live compass from phone via [PhyPhox](https://phyphox.org))
 - Toggle individual cards and visual features
+- Click through to desktop (on by default): clicks on the sky reach the desktop icons and windows
+  below; only the gear, compass and forecast cards respond. Turn it off to hover constellation names.
 
 Settings are saved to `~/.config/caelum/config.json` (an older `config.json` next to `desktop_tracker.py` is migrated automatically on first run).
 
@@ -131,10 +133,10 @@ Settings are saved to `~/.config/caelum/config.json` (an older `config.json` nex
 
 | Key / Action | Effect |
 |---|---|
-| Ctrl+H | Toggle clean mode |
+| Ctrl+H | Toggle clean mode (keys work once Caelum has focus: click the gear, compass or a card) |
 | Ctrl+S | Open settings |
 | Ctrl+Q | Quit |
-| Right-click | Open settings |
+| Right-click | Open settings (on the sky only when click-through is off) |
 | Click compass | Set facing direction |
 | Click forecast day | Expand hourly accordion |
 

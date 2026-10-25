@@ -78,6 +78,7 @@ class SkyTracker(Gtk.Window):
         self._selected_day       = None   # date string 'YYYY-MM-DD' of clicked weekly card
         self._selected_day_slots = []     # hourly slots for selected day (cached in _on_click)
         self._weekly_card_rects  = []     # [(date_str, x, y, w, h), ...]
+        self._input_rects        = ()     # input region last applied (see _update_input_region)
         self._city_name          = None   # reverse-geocoded city name
         self._moon_limb_angle    = 0.0    # stored each frame for use in info card icon
         self._today_str          = datetime.date.today().isoformat()
@@ -505,6 +506,33 @@ class SkyTracker(Gtk.Window):
                                              'crosshair' if over_cmp else 'default'))
             self.da.queue_draw()
 
+    def _update_input_region(self, W, H):
+        """Click-through: the window takes input only on its controls, so clicks on the sky
+        reach the desktop icons and windows below. Without it the whole screen is hit-testable."""
+        cfg = self.cfg
+        if not cfg.get('click_through', True):
+            rects = None
+        else:
+            r = 22
+            rects = [(self._gear_cx - r, self._gear_cy - r, 2 * r, 2 * r)]
+            if cfg.get('app_enabled', True):   # switched off: only the gear is drawn
+                if cfg.get('show_compass', True) and self._hw_heading is None:
+                    c = self._cmp_r
+                    rects.append((self._cmp_cx - c, self._cmp_cy - c, 2 * c, 2 * c))
+                if not cfg.get('clean_mode', False) and cfg.get('show_weekly_forecast', True):
+                    rects += [rect[1:] for rect in self._weekly_card_rects]
+            rects = tuple(tuple(int(round(v)) for v in rect) for rect in rects)
+        if rects == self._input_rects:
+            return
+        self._input_rects = rects
+        if rects is None:
+            self.input_shape_combine_region(None)
+        else:
+            self.input_shape_combine_region(
+                cairo.Region([cairo.RectangleInt(x, y, w, h) for x, y, w, h in rects]))
+        if self._hover_const and rects is not None:
+            self._hover_const = None   # no motion events reach the sky any more
+
     def _hit_test_constellation(self, mx, my):
         threshold = 22.0
         for name, polylines in _CONSTELLATIONS:
@@ -576,6 +604,7 @@ class SkyTracker(Gtk.Window):
             cr.paint()
             cr.set_operator(cairo.Operator.OVER)
             self._draw_gear_btn(cr, gx, gy, 16, off=True)
+            self._update_input_region(W, H)
             return
 
         # ── sky gradient + stars (clouds come after the bodies, so they can pass in front)
@@ -666,6 +695,7 @@ class SkyTracker(Gtk.Window):
 
         # ── Gear / settings button
         self._draw_gear_btn(cr, gx, gy, 16)
+        self._update_input_region(W, H)
 
         # ── Constellation hover label
         if (self._hover_const

@@ -35,6 +35,7 @@ DEFAULT_CONFIG = {
         "cloud_cover": True
     },
     "clean_mode": False,
+    "click_through": True,
     "keep_above": False,
     "sticky": True,
     "show_constellations": True,
