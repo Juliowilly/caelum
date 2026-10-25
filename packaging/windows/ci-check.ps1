@@ -36,15 +36,16 @@ function Shot($name) {
 $cfgDir = "$env:APPDATA\caelum"
 New-Item -ItemType Directory -Force $cfgDir | Out-Null
 $failed = @()
-# GDK_WIN32_LAYERED: Caelum sets 0 unless the environment has it; 1 tries GTK's layered painting
-$runs = foreach ($l in '0') { foreach ($m in 'behind-icons', 'click-through-off') { ,@($m, $l) } }
+# TEMPORARY bisection: which Windows step stops GTK drawing (CAELUM_WIN_SKIP)
+$runs = @(@('click-through-off', ''), @('click-through-off', 'place'), @('click-through-off', 'style'),
+          @('click-through-off', 'tray,hit'), @('behind-icons', ''))
 foreach ($run in $runs) {
-    $place, $env:GDK_WIN32_LAYERED = $run
-    $mode = "$place-layered$($env:GDK_WIN32_LAYERED)"
+    $place, $env:CAELUM_WIN_SKIP = $run
+    $mode = "$place-skip-$($env:CAELUM_WIN_SKIP -replace ',', '+')"
     $ct = if ($place -eq 'behind-icons') { 'true' } else { 'false' }
     Set-Content "$cfgDir\config.json" "{`"click_through`": $ct, `"facing`": 180.0}"
     $p = Start-Process -FilePath $Exe -PassThru
-    Start-Sleep -Seconds 25
+    Start-Sleep -Seconds 22
     Shot "$mode-1"
     Start-Sleep -Seconds 5
     Shot "$mode-2"            # compared with -1: the sky must keep repainting

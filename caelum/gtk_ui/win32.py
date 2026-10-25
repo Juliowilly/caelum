@@ -167,7 +167,8 @@ def place_sky(hwnd, behind_icons):
         # and a plain bottom-most window didn't show either (Windows Server 2025 runner)
         ex |= _WS_EX_LAYERED
         _layered_by_us.add(hwnd)
-    user32.SetWindowLongPtrW(hwnd, _GWL_EXSTYLE, ex)
+    if 'style' not in os.environ.get('CAELUM_WIN_SKIP', ''):   # TEMPORARY: CI bisection
+        user32.SetWindowLongPtrW(hwnd, _GWL_EXSTYLE, ex)
     if hwnd in _layered_by_us:
         user32.SetLayeredWindowAttributes(hwnd, 0, 255, _LWA_ALPHA)
     style = user32.GetWindowLongPtrW(hwnd, _GWL_STYLE)

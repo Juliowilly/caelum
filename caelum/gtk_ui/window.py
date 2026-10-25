@@ -300,8 +300,10 @@ class SkyTracker(Gtk.Window):
         self._placed_for   = None    # click_through value the window was placed for
         self._behind_icons = False
         self._win_scale    = 1.0     # Windows pixels per GTK pixel
-        self._tray         = self._make_tray()
-        self._hit          = self._make_hit_layer()
+        skip = os.environ.get('CAELUM_WIN_SKIP', '').split(',')   # TEMPORARY: CI bisection
+        self._skip = skip
+        self._tray         = None if 'tray' in skip else self._make_tray()
+        self._hit          = None if 'hit' in skip else self._make_hit_layer()
         GLib.timeout_add_seconds(5, self._update_insets)   # the taskbar can move or auto-hide
         self._frames = 0
         GLib.timeout_add_seconds(10, self._log_frames)
@@ -312,6 +314,8 @@ class SkyTracker(Gtk.Window):
     def _place_on_desktop(self):
         want = self.cfg.get('click_through', True)
         self._placed_for = want
+        if 'place' in self._skip:
+            return
         try:
             behind = self._win32.place_sky(self._win32.hwnd_of(self.get_window()), want)
         except Exception as e:
@@ -320,10 +324,10 @@ class SkyTracker(Gtk.Window):
         if self._behind_icons and not behind:
             self._win32.restore_desktop()
         self._behind_icons = behind
-        if behind:
+        if behind and self._hit:
             self._hit.show_all()
             self._win32.place_hit_layer(self._win32.hwnd_of(self._hit.get_window()))
-        else:
+        elif self._hit:
             self._hit.hide()
         self._input_rects = ()   # stale: set the click region again at the next draw
         alloc = self.da.get_allocation()
@@ -741,7 +745,7 @@ class SkyTracker(Gtk.Window):
         self._input_rects = rects
         if self._win32:
             # Behind the icons the sky gets no clicks: the hit layer takes them on the controls
-            if self._behind_icons:
+            if self._behind_icons and self._hit:
                 self._win32.set_hit_region(self._win32.hwnd_of(self._hit.get_window()), rects,
                                            self._win_scale)
             return
