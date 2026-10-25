@@ -879,3 +879,7 @@ thick low cloud: 80% cirrus alone left the sun at ~33% and greyed the sky with t
 - **GitHub release v1.2.0** with the .deb, .snap and .flatpak; downloaded assets' SHA-256 match.
 - **PPA**: 1.2.0 sources signed and uploaded for noble + resolute; accepted, builds started.
 - **Snap Store**: revision 3 → beta; user tested it → **promoted to stable**.
+- **PPA 1.2.0 built**: noble and resolute both "Successfully built" (~3 min each, started 09:38 UTC).
+  Gotcha: this time **both** API endpoints (`api.launchpad.net` and `launchpad.net/api/devel`) kept
+  reporting "Currently building" 20 min after the builds had finished; the build web pages
+  (`…/+archive/ubuntu/caelum/+build/<id>`) were correct. All channels are now on 1.2.0.
