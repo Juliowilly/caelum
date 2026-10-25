@@ -66,22 +66,93 @@ def _soft_puff(cr, cx, cy, rx, ry, r, g, b, alpha):
     cr.fill()
     cr.restore()
 
-def _draw_overcast_sheet(cr, W, H, total, top_col, dark_col):
-    """Uniform gray ceiling for heavily overcast skies (total > 65%)."""
-    t  = _clamp((total - 65) / 35.0, 0.0, 1.0)
-    rt, gt, bt = top_col
-    rd, gd, bd = dark_col
-    sr = (rd + rt) * 0.52;  sg = (gd + gt) * 0.52;  sb = (bd + bt) * 0.54
-    y0    = H * 0.72
-    alpha = t * 0.52
-    grad  = cairo.LinearGradient(0, 0, 0, y0)
-    grad.add_color_stop_rgba(0.00, sr, sg, sb, alpha * 0.95)
-    grad.add_color_stop_rgba(0.38, sr, sg, sb, alpha * 0.85)
-    grad.add_color_stop_rgba(0.72, sr, sg, sb, alpha * 0.35)
-    grad.add_color_stop_rgba(1.00, sr, sg, sb, 0.0)
-    cr.rectangle(0, 0, W, y0)
+def deck_colour(top_col, dark_col):
+    """Grey of a cloud base seen from below: the palette's mix, mostly desaturated."""
+    c = [0.55 * d + 0.45 * t for t, d in zip(top_col, dark_col)]
+    lum = 0.30 * c[0] + 0.59 * c[1] + 0.11 * c[2]
+    return tuple(0.88 * (lum + (v - lum) * 0.35) for v in c)
+
+def draw_mid_sheet(cr, W, H, sheet, top_col, dark_col):
+    """
+    Altostratus: a smooth, pale grey sheet with no visible cells, the sun a dim disc
+    through it ("ground glass"). Paler than a low deck: it is higher and thinner.
+    """
+    if sheet <= 0:
+        return
+    r, g, b = (min(1.0, v * 1.12) for v in deck_colour(top_col, dark_col))
+    a = 0.70 * sheet ** 1.2
+    y_hor = H * 0.72
+    grad = cairo.LinearGradient(0, 0, 0, y_hor)
+    grad.add_color_stop_rgba(0.00, r * 0.92, g * 0.92, b * 0.94, a)
+    grad.add_color_stop_rgba(1.00, r,        g,        b,        a * 0.85)
+    cr.rectangle(0, 0, W, y_hor)
     cr.set_source(grad)
     cr.fill()
+
+def _deck_cells(tex, W, H, deck, rgb):
+    """Paint the deck's cells into tex, seamless across its left/right edges (width W)."""
+    r, g, b = rgb
+    y_hor  = H * 0.72
+    a_cell = 0.48 * deck
+    y, k = 0.0, 0
+    while y < y_hor - H * 0.01:
+        ch = max(H * 0.022, 0.17 * (y_hor - y))     # row height shrinks toward the horizon
+        cw = ch * 3.4
+        a_row = a_cell * _clamp(ch / (0.04 * H), 0.25, 1.0)   # far rows blend together
+        n = max(1, round(W / (cw * 0.75)))
+        for i in range(n):
+            rng = random.Random(f'deck:{k}:{i}')
+            x0 = (i + rng.uniform(-0.25, 0.25)) * W / n
+            cy = y + ch * 0.5 + rng.uniform(-0.15, 0.15) * ch
+            dark = rng.uniform(0.70, 0.84)
+            rx, ry = cw * rng.uniform(0.45, 0.62), ch * rng.uniform(0.40, 0.55)
+            a_c, a_rim = a_row * rng.uniform(0.6, 1.0), a_row * 0.45 * rng.uniform(0.5, 1.0)
+            for x in (x0 - W, x0, x0 + W):          # wrap copies keep the texture seamless
+                if x + cw < 0 or x - cw > W:
+                    continue
+                _soft_puff(tex, x, cy, rx, ry, r * dark, g * dark, b * (dark + 0.03), a_c)
+                # Paler thin rim on the lit side, offset a little upward
+                _soft_puff(tex, x + cw * 0.10, cy - ch * 0.22, cw * 0.30, ch * 0.16,
+                           min(1, r * 1.15), min(1, g * 1.15), min(1, b * 1.12), a_rim)
+        y += ch * 0.80
+        k += 1
+
+_deck_tex = {'key': None, 'surf': None}
+
+def draw_deck(cr, W, H, deck, top_col, dark_col, drift=0.0):
+    """
+    Overcast stratocumulus/stratus deck seen from below: a grey ceiling over the whole sky,
+    with rows of flat cells that shrink and flatten toward the horizon (perspective) and drift
+    with the low-cloud wind. While the deck is not closed (deck < 1) the base is thinner and
+    the gaps between cells let the sky through. The cells are painted once into a seamless
+    texture that slides with the drift.
+    """
+    if deck <= 0:
+        return
+    rgb = deck_colour(top_col, dark_col)
+    r, g, b = rgb
+    y_hor = H * 0.72
+
+    # Base ceiling: darker overhead, paler toward the horizon where you look through more of it
+    a = 0.92 * deck ** 1.2
+    grad = cairo.LinearGradient(0, 0, 0, y_hor)
+    grad.add_color_stop_rgba(0.00, r * 0.86, g * 0.86, b * 0.88, a)
+    grad.add_color_stop_rgba(0.60, r,        g,        b,        a * 0.96)
+    grad.add_color_stop_rgba(1.00, min(1, r * 1.12), min(1, g * 1.12), min(1, b * 1.10), a * 0.90)
+    cr.rectangle(0, 0, W, y_hor)
+    cr.set_source(grad)
+    cr.fill()
+
+    # Cells: thick parts darker, thinner edges paler
+    key = (W, H, round(deck, 2), tuple(round(v, 2) for v in rgb))
+    if key != _deck_tex['key']:
+        surf = cr.get_target().create_similar(cairo.Content.COLOR_ALPHA, W, int(y_hor) + 1)
+        _deck_cells(cairo.Context(surf), W, H, deck, rgb)
+        _deck_tex.update(key=key, surf=surf)
+    shift = (drift * W) % W
+    for x in (-shift, W - shift):
+        cr.set_source_surface(_deck_tex['surf'], x, 0)
+        cr.paint()
 
 def draw_cirrus(cr, W, H, coverage, col, drift=0.0):
     """High-altitude ice clouds: thin wispy streaks with fade envelope and parallel fibers."""

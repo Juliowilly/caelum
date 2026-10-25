@@ -2,7 +2,7 @@ import unittest
 
 from caelum.core.astronomy import phase_index
 from caelum.core.sky import (
-    band_slots, cloud_layers, opaque_cover, set_facing, sky_to_screen, veil_transmission,
+    band_slots, cloud_layers, mid_sheet, opaque_cover, overcast_deck, set_facing, sky_to_screen, veil_transmission,
 )
 
 W, H = 1000, 500
@@ -53,6 +53,16 @@ class CloudOpticsTest(unittest.TestCase):
     def test_overcast_low_deck_hides_the_sun(self):
         self.assertLess(veil_transmission(_clouds(100, low=100)), 0.2)
         self.assertEqual(opaque_cover(_clouds(100, low=100)), 1.0)
+
+    def test_deck_only_for_thick_closed_cloud(self):
+        self.assertEqual(overcast_deck(_clouds(60, low=60)), 0.0)
+        self.assertEqual(overcast_deck(_clouds(100, high=100)), 0.0)   # cirrus never closes
+        self.assertEqual(overcast_deck(_clouds(100, low=100)), 1.0)
+        self.assertTrue(0.0 < overcast_deck(_clouds(80, low=80)) < 1.0)
+
+    def test_altostratus_sheet(self):
+        self.assertEqual(mid_sheet(_clouds(50, mid=50)), 0.0)
+        self.assertEqual(mid_sheet(_clouds(100, mid=100)), 1.0)
 
     def test_band_covers_the_body_as_often_as_the_sky(self):
         # Slots are ~one cloud wide, so the share of slots shown = share of time covered

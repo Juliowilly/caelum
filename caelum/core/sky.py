@@ -92,6 +92,14 @@ def opaque_cover(clouds):
         clear *= 1.0 - _LAYER_OPACITY[name] * _clamp(cov / 100.0, 0.0, 1.0)
     return 1.0 - clear
 
+def overcast_deck(clouds):
+    """How closed the cloud deck is, 0–1: from ~65% opaque cover to a solid ceiling at ~95%."""
+    return _clamp((opaque_cover(clouds) - 0.65) / 0.30, 0.0, 1.0)
+
+def mid_sheet(clouds):
+    """How closed the mid-level layer is, 0–1: altocumulus merging into altostratus."""
+    return _clamp((cloud_layers(clouds)[1] - 60) / 40.0, 0.0, 1.0)
+
 def veil_transmission(clouds):
     """
     Uniform dimming of the sun/moon by layers dense enough to form a continuous sheet.
@@ -100,7 +108,7 @@ def veil_transmission(clouds):
     """
     low, mid, high = cloud_layers(clouds)
     t  = 1.0 - 0.15 * _clamp(high / 100.0, 0.0, 1.0)         # cirrostratus
-    t *= 1.0 - 0.55 * _clamp((mid - 60) / 40.0, 0.0, 1.0)    # altostratus sheet
+    t *= 1.0 - 0.55 * mid_sheet(clouds)                       # altostratus sheet
     t *= 1.0 - 0.85 * _clamp((low - 70) / 30.0, 0.0, 1.0)    # stratus / stratocumulus deck
     return t
 

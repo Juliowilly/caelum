@@ -781,3 +781,30 @@ thick low cloud: 80% cirrus alone left the sun at ~33% and greyed the sky with t
 - 14 tests pass (band coverage share ≈ cover, cover change keeps existing slots); pyflakes clean.
 - Still open: overcast as a uniform deck; general cumulus stay near the horizon (only the band
   reaches the sun's height).
+
+### Overcast deck and altostratus sheet (replaces `_draw_overcast_sheet`)
+- Before: above 65% *total* a translucent grey gradient (max alpha 0.52) with the usual white puffs
+  on it, so 95% overcast read as fair-weather clouds on a grey sky.
+- `core.sky.overcast_deck()`: 0 → 1 as opaque cover goes 65% → 95% (cirrus never closes it);
+  `mid_sheet()`: 0 → 1 as mid cover goes 60% → 100% (also used by `veil_transmission`).
+- `clouds.draw_deck()`: stratocumulus/stratus ceiling seen from below — a desaturated grey base
+  (`deck_colour()` from the cloud palette, so sunset/night tint it), darker overhead and paler toward
+  the horizon, alpha `0.92·deck^1.2` (fades in continuously); rows of flat cells, darker thick
+  cores with a pale rim, shrinking toward the horizon (perspective), far rows blended.
+  The cells are painted once into a seamless texture (wrap copies at ±W, cached on size, deck
+  strength and colour) that slides with the low-layer drift. Per-row parallax was dropped for this:
+  at < 1 px/s it wasn't visible, and painting ~900 cells per drift step cost ~150 ms.
+- `clouds.draw_mid_sheet()`: altostratus, a smooth pale sheet with no cells, alpha `0.70·sheet^1.2`;
+  the sun shows as a dim "ground-glass" disc (veil) through it.
+- `_render_clouds` order: cirrus → altocumulus → mid sheet → deck → cumulus. Layers above the deck
+  fade with `1 − deck`; altocumulus also with `1 − 0.85·sheet`; cumulus puffs (white sunlit tops,
+  not seen from under a ceiling) with `1 − deck²`. New helper `_draw_faded` (push_group +
+  paint_with_alpha).
+
+### Verified (overcast)
+- Renders: low 80% (thin deck forming, puffs still distinct), low 95% and low 100% + rain (grey
+  ceiling with cells, sun as a diffuse bright patch), mid 100% (pale sheet, dim sun disc), low 95% at
+  sunset (warm-tinted deck) and at night with the moon (dark deck, soft moon glow).
+- 1920×1080 overcast: full cloud re-render on a drift step 256 → 80 ms after the deck texture
+  (happens ~every 1.5 s at 4 m/s); cached frames ~27 ms.
+- 16 tests pass (deck/sheet thresholds); pyflakes clean.

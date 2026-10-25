@@ -27,14 +27,14 @@ from ..core.config import DEFAULT_CONFIG, load_config, save_config
 from ..core.i18n import _PHASE_NAMES, _day_name, _fmt_date, _t
 from ..core.sky import (
     _clamp, _cloud_palette, _seg_dist, cloud_layers, get_facing,
-    moon_brightness, opaque_cover, set_facing, sky_color_adaptive, sky_to_screen,
+    mid_sheet, moon_brightness, overcast_deck, set_facing, sky_color_adaptive, sky_to_screen,
     veil_transmission,
 )
 from ..core.weather import (
     _NO_CLOUDS, _WX_ACCENT, _WX_LABEL, fetch_met_norway, fetch_open_meteo, merge_weather,
 )
 from .clouds import (
-    _draw_overcast_sheet, _soft_puff, draw_altocumulus, draw_cirrus, draw_cumulus,
+    _soft_puff, draw_altocumulus, draw_cirrus, draw_cumulus, draw_deck, draw_mid_sheet,
 )
 from . import sandbox
 from .settings import SettingsDialog
@@ -1115,25 +1115,41 @@ class SkyTracker(Gtk.Window):
         cr.set_source_surface(self._cloud_surf, 0, 0)
         cr.paint()
 
+    @staticmethod
+    def _draw_faded(cr, alpha, draw, *args, **kwargs):
+        """Run a cloud draw function at reduced overall opacity (skipped when invisible)."""
+        if alpha <= 0.0:
+            return
+        if alpha < 1.0:
+            cr.push_group()
+        draw(cr, *args, **kwargs)
+        if alpha < 1.0:
+            cr.pop_group_to_source()
+            cr.paint_with_alpha(alpha)
+
     def _render_clouds(self, cr, W, H, clouds, sun_el, body, drift):
         top_col, dark_col, cir_col = _cloud_palette(sun_el)
 
         low_cov, mid_cov, high_cov = cloud_layers(clouds)
         wmo = clouds.get('wmo', 0)
 
-        # Overcast sheet: uniform gray ceiling only when the thick layers close up
-        opaque = opaque_cover(clouds) * 100
-        if opaque > 65:
-            _draw_overcast_sheet(cr, W, H, opaque, top_col, dark_col)
-
-        # Back-to-front: cirrus → altocumulus → cumulus. A band of clouds drifts past the
-        # sun/moon, hiding it for the share of time given by the cover; the rest of the
-        # time it is clear: broken cloud doesn't dim the whole sky.
-        pos = body[:2] if body else None
-        draw_cirrus(     cr, W, H, high_cov, cir_col,           drift=drift['high'])
-        draw_altocumulus(cr, W, H, mid_cov,  top_col,           drift=drift['mid'], body=body)
-        draw_cumulus(    cr, W, H, low_cov,  top_col, dark_col, wmo=wmo,
-                         drift=drift['low'], body=body)
+        # Back-to-front: cirrus → altocumulus → overcast deck → cumulus. A band of clouds
+        # drifts past the sun/moon, hiding it for the share of time given by the cover; the
+        # rest of the time it is clear: broken cloud doesn't dim the whole sky.
+        pos  = body[:2] if body else None
+        deck = overcast_deck(clouds)
+        sheet = mid_sheet(clouds)
+        above = 1.0 - deck   # layers above the deck vanish as it closes
+        self._draw_faded(cr, above, draw_cirrus, W, H, high_cov, cir_col, drift=drift['high'])
+        # As a layer closes into a sheet, its separate clouds merge into it
+        self._draw_faded(cr, above * (1.0 - 0.85 * sheet), draw_altocumulus,
+                         W, H, mid_cov, top_col, drift=drift['mid'], body=body)
+        draw_mid_sheet(cr, W, H, sheet * max(above, 0.3), top_col, dark_col)
+        # The deck hides what is above it; puffs (white, sunlit tops that can't be seen
+        # from under a ceiling) fade into it as it closes
+        draw_deck(cr, W, H, deck, top_col, dark_col, drift=drift['low'])
+        self._draw_faded(cr, 1.0 - deck ** 2, draw_cumulus,
+                         W, H, low_cov, top_col, dark_col, wmo=wmo, drift=drift['low'], body=body)
 
         # Celestial body glow: illuminates clouds around sun/moon position
         if pos:
