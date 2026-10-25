@@ -979,3 +979,9 @@ thick low cloud: 80% cirrus alone left the sun at ~33% and greyed the sky with t
 - Screenshots: `day.png` and `sunset.png` re-rendered with the opaque sky over the real forecast (scratch
   `shots.py`, which now also takes a night shot). `night.png` kept: the new 21:00 full-moon render was
   washed out, and the old 02:30 dark sky looks the same with the opaque sky. `settings.png` kept.
+- **Builds**: `.deb` 1.3.0-1; snap after `snapcraft clean caelum` → `caelum_1.3.0_amd64.snap`
+  (`meta/snap.yaml` and the bundled `__init__.py` both say 1.3.0); flatpak bundle 217 KB, installed and
+  `flatpak run … --version` → "Caelum 1.3.0".
+- **GitHub release v1.3.0** with the .deb, .snap and .flatpak; downloaded assets' SHA-256 match.
+- **PPA**: 1.3.0 sources signed and uploaded for noble + resolute.
+- **Snap Store**: revision 4 → beta, waiting for the user's test before promoting to stable.
