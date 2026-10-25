@@ -1596,3 +1596,6 @@ Releases; (3) built on GitHub Actions. This session: step 1, on the `windows` br
   Progman, a full-screen window itself. The bottom-most sky now goes just above Progman. The
   layered bit added for 24H2 is tracked per window, and removed again when the switch brings the
   sky in front of the icons.
+- Sixth run: behind the icons still fine; click-through off still showed nothing, even just above
+  Progman. The only run where it showed (the fourth) had a layered window, so the sky is now
+  layered with plain alpha 255 in both modes.

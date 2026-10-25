@@ -123,7 +123,7 @@ def _primary_rect():
     return r.left, r.top, r.right - r.left, r.bottom - r.top
 
 
-_layered_by_us = set()   # sky windows made layered here (24H2), not by GTK
+_layered_by_us = set()   # sky windows made layered here, not by GTK
 
 
 def primary_size():
@@ -145,18 +145,18 @@ def place_sky(hwnd, behind_icons):
     gtk_layered = bool(ex & _WS_EX_LAYERED) and hwnd not in _layered_by_us
     # Never in the taskbar or Alt+Tab, and a click doesn't raise it over the user's windows
     ex = (ex | _WS_EX_TOOLWINDOW | _WS_EX_NOACTIVATE) & ~_WS_EX_APPWINDOW
+    if not gtk_layered:
+        # Layered and fully opaque: 24H2's Progman is composited and only draws a layered child,
+        # and a plain bottom-most window didn't show either (Windows Server 2025 runner)
+        ex |= _WS_EX_LAYERED
+        _layered_by_us.add(hwnd)
+    user32.SetWindowLongPtrW(hwnd, _GWL_EXSTYLE, ex)
+    if hwnd in _layered_by_us:
+        user32.SetLayeredWindowAttributes(hwnd, 0, 255, _LWA_ALPHA)
     style = user32.GetWindowLongPtrW(hwnd, _GWL_STYLE)
     layer = _icon_layer() if behind_icons else None
-    print(f'Caelum: GTK window layered={gtk_layered}', file=sys.stderr, flush=True)
     if layer:
         parent, below = layer
-        if below and not gtk_layered:
-            # 24H2's Progman is composited: only a layered child gets drawn there (fully opaque)
-            ex |= _WS_EX_LAYERED
-            _layered_by_us.add(hwnd)
-        user32.SetWindowLongPtrW(hwnd, _GWL_EXSTYLE, ex)
-        if hwnd in _layered_by_us:
-            user32.SetLayeredWindowAttributes(hwnd, 0, 255, _LWA_ALPHA)
         user32.SetWindowLongPtrW(hwnd, _GWL_STYLE, (style | _WS_CHILD) & ~_WS_POPUP)
         user32.SetParent(hwnd, parent)
         x -= user32.GetSystemMetrics(_SM_XVIRTUALSCREEN)
@@ -164,10 +164,6 @@ def place_sky(hwnd, behind_icons):
         user32.SetWindowPos(hwnd, below or _HWND_BOTTOM, x, y, 0, 0, flags)
         _log(hwnd, 'behind the icons (24H2 Progman)' if below else 'behind the icons (WorkerW)')
         return True
-    if hwnd in _layered_by_us:
-        ex &= ~_WS_EX_LAYERED
-        _layered_by_us.discard(hwnd)
-    user32.SetWindowLongPtrW(hwnd, _GWL_EXSTYLE, ex)
     user32.SetParent(hwnd, None)
     user32.SetWindowLongPtrW(hwnd, _GWL_STYLE, (style | _WS_POPUP) & ~_WS_CHILD)
     # Just above the desktop (Progman, a full-screen window of its own), not under it
