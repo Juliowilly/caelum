@@ -964,3 +964,9 @@ thick low cloud: 80% cirrus alone left the sun at ~33% and greyed the sky with t
   horizon; night near-black; overcast day grey; full moon lifts the night). 26 tests pass, pyflakes clean.
   Rendered 8 scenes (noon clear/30 %/overcast, golden hour, sunset, dusk, night, night 60 %) over a
   white wallpaper: none of it shows through.
+- **Opaque sky on by default** (user's choice). `load_config` fills missing keys from `DEFAULT_CONFIG`,
+  so existing installs switch to it too on upgrade. They can turn it off in Settings.
+- **No bundled wallpaper**: with the opaque sky on, the wallpaper only shows in the Activities overview
+  and when Caelum isn't running. The existing export ("Desktop background") already sets the wallpaper
+  to Caelum's own sky every 5 min, and with the opaque sky it now has a proper day sky. A static image
+  would be wrong for most of the day. README points to the export instead.

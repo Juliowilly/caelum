@@ -213,7 +213,7 @@ class SettingsDialog(Gtk.Window):
         l_os.set_tooltip_text('Paint the whole sky (bright blue by day, black at night) '
                               'instead of tinting the wallpaper behind it.')
         sw_os = Gtk.Switch()
-        sw_os.set_active(self.cfg.get('opaque_sky', False))
+        sw_os.set_active(self.cfg.get('opaque_sky', True))
         sw_os.connect('notify::active', lambda s, p: (
             self.cfg.update({'opaque_sky': s.get_active()}),
             save_config(self.cfg), self.par.da.queue_draw()))

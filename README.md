@@ -114,9 +114,11 @@ Click the gear button (bottom-right) to open Settings:
 - Language
 - Facing direction (or live compass from phone via [PhyPhox](https://phyphox.org))
 - Toggle individual cards and visual features
-- Opaque sky (off by default): Caelum paints the whole sky itself, bright blue by day and black at night,
+- Opaque sky (on by default): Caelum paints the whole sky itself, bright blue by day and black at night,
   so the wallpaper no longer matters. Off, the sky is a tint over your wallpaper; then a dark navy
   wallpaper works best (e.g. a gradient `#05081A` → `#1A2440` at 72 % height → `#0A0C14`).
+  For the wallpaper itself (seen in the Activities overview, or when Caelum isn't running), set
+  "Export sky to" → *Desktop background*: Caelum saves its own sky as the wallpaper every 5 minutes.
 - Click through to desktop (on by default): clicks on the sky reach the desktop icons and windows
   below; only the gear, compass and forecast cards respond. Clicking the compass or a card starts
   *explore mode*: the whole sky takes the mouse (constellation names on hover) until it is idle for 20 s,

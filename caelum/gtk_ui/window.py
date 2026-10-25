@@ -737,7 +737,7 @@ class SkyTracker(Gtk.Window):
 
     def _draw_sky(self, cr, W, H, sun_el, sun_az, clouds, m_bright, star_vis=1.0,
                   lat=6.14, lon=1.21, utc=None):
-        if self.cfg.get('opaque_sky', False) or self._exporting:
+        if self.cfg.get('opaque_sky', True) or self._exporting:
             # Paint the whole sky so the wallpaper doesn't show (the exported image always does)
             zen, hor, g_top, g_bot = opaque_sky(sun_el, clouds, m_bright)
             base = cairo.LinearGradient(0, 0, 0, H)
