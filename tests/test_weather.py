@@ -2,7 +2,7 @@ import struct
 import unittest
 import zlib
 
-from caelum.core import rain_now, radar
+from caelum.core import metar, observed, radar
 from caelum.core.metar import nearest, parse
 from caelum.core.weather import merge_weather
 
@@ -18,63 +18,114 @@ METAR_DRY = 'METAR ABCD 251230Z 19010KT 160V230 9999 FEW017 32/25 Q1011 NOSIG'
 METAR_GARBLED = 'METAR ABCD 251300Z 19011KT 150V210 9999 FEW017 32/26 Q110 XXXXYYYY SAAO20 ZZZZ 251300 METAR '
 
 
+def rain(r):
+    return {'rain': r}
+
+
+SKY_FEW = {'layers': [(19, 1700)], 'sensed_top': 99999, 'source': 'airport'}
+AIR = {'temp': 32.0, 'humidity': 67, 'wind_speed': 5.1, 'wind_dir': 190.0, 'source': 'airport'}
+
+
 class MergeWeatherTest(unittest.TestCase):
     def test_observed_dry_beats_forecast_rain(self):
-        w = merge_weather(OM, MET, DRY)
-        self.assertEqual((w['precip'], w['wmo'], w['rain_source']), (0.0, 3, 'rainviewer'))
+        w = merge_weather(OM, MET, rain(DRY))
+        self.assertEqual((w['precip'], w['wmo'], w['sources']['rain']), (0.0, 3, 'rainviewer'))
 
     def test_observed_rain_shows_when_forecasts_are_dry(self):
-        w = merge_weather(OM, dict(MET, precip=0.0, wmo=3), WET)
-        self.assertEqual((w['precip'], w['wmo']), (2.5, 63))
+        w = merge_weather(OM, dict(MET, precip=0.0, wmo=3), rain(WET))
+        self.assertEqual((w['precip'], w['wmo'], w['symbol']), (2.5, 63, 'rain'))
 
     def test_thunder(self):
         # an airport reports it; radar can't, so a radar-seen shower keeps the model's storm code
-        self.assertEqual(merge_weather(OM, MET, dict(WET, thunder=True, precip=8.0))['wmo'], 99)
-        self.assertEqual(merge_weather(OM, dict(MET, wmo=95), WET)['wmo'], 95)
-        self.assertEqual(merge_weather(OM, dict(MET, wmo=95), DRY)['wmo'], 3)
+        self.assertEqual(merge_weather(OM, MET, rain(dict(WET, thunder=True, precip=8.0)))['wmo'], 99)
+        self.assertEqual(merge_weather(OM, dict(MET, wmo=95), rain(WET))['wmo'], 95)
+        self.assertEqual(merge_weather(OM, dict(MET, wmo=95), rain(DRY))['wmo'], 3)
 
-    def test_airport_is_named(self):
-        w = merge_weather(OM, MET, dict(DRY, source='airport', station='ABCD', km=5.6))
-        self.assertEqual((w['rain_source'], w['rain_station']), ('airport', ('ABCD', 5.6)))
-
-    def test_without_observation_met_forecast_decides(self):
+    def test_without_observation_forecasts_decide(self):
         w = merge_weather(dict(OM, precip=3.0, wmo=63), dict(MET, precip=0.0, wmo=3))
-        self.assertEqual((w['precip'], w['rain_source']), (0.0, 'met_forecast'))
+        self.assertEqual(w['precip'], 0.0)
+        self.assertEqual(w['sources'], {'rain': 'met_forecast', 'sky': 'models', 'air': 'met_forecast'})
+        self.assertIsNone(w['station'])
 
     def test_open_meteo_alone(self):
         w = merge_weather(dict(OM, precip=3.0, wmo=63), None)
-        self.assertEqual((w['precip'], w['rain_source']), (3.0, 'om_forecast'))
+        self.assertEqual((w['precip'], w['sources']['rain'], w['sources']['air']), (3.0, 'om_forecast', None))
 
-    def test_met_still_gives_temperature_wind_and_forecast(self):
-        w = merge_weather(OM, MET, DRY)
-        self.assertEqual((w['temp'], w['wind_speed'], w['wind_dir']), (20.0, 4.0, 220.0))
+    def test_observed_sky_replaces_the_models_clouds(self):
+        # A manned airport reporting a few low clouds: the models' 95 % cover goes
+        w = merge_weather(OM, MET, {'rain': DRY, 'sky': SKY_FEW, 'station': ('ABCD', 5.6)})
+        self.assertEqual((w['low'], w['mid'], w['high'], w['total']), (19, 0, 0, 19))
+        self.assertEqual((w['wmo'], w['symbol'], w['sources']['sky']), (1, 'fair', 'airport'))
+        self.assertEqual(w['station'], ('ABCD', 5.6))
+
+    def test_automatic_station_keeps_the_models_high_cloud(self):
+        sky = {'layers': [], 'sensed_top': 12000, 'source': 'airport'}
+        w = merge_weather(OM, MET, {'sky': sky})
+        self.assertEqual((w['low'], w['high']), (0, OM['high']))
+
+    def test_met_alone_cloud_total_counts_as_mid(self):
+        w = merge_weather(None, MET, {'sky': dict(SKY_FEW, layers=[], sensed_top=5000)})
+        self.assertEqual((w['low'], w['mid']), (0, MET['total']))
+
+    def test_observed_air(self):
+        w = merge_weather(OM, MET, {'air': AIR, 'station': ('ABCD', 5.6)})
+        self.assertEqual((w['temp'], w['humidity'], w['wind_speed'], w['wind_dir']), (32.0, 67, 5.1, 190.0))
+        self.assertEqual(w['sources']['air'], 'airport')
+        w = merge_weather(OM, MET, {'air': dict(AIR, wind_dir=None)})
+        self.assertEqual(w['wind_dir'], MET['wind_dir'])      # variable wind: keep the model's
+
+    def test_met_still_gives_the_forecast(self):
+        w = merge_weather(OM, MET, {'rain': DRY, 'sky': SKY_FEW, 'air': AIR})
         self.assertEqual(w['daily_forecast'], MET['daily_forecast'])
 
 
-class SelectorTest(unittest.TestCase):
+class ObservedTest(unittest.TestCase):
+    FIELD = {'precip': 0.0, 'snow': False, 'thunder': True, 'temp': 30.0, 'humidity': 70, 'wind_speed': 4.0,
+             'wind_dir': 200.0, 'layers': [(44, 2000)], 'auto': False, 'sensed_top': 99999,
+             'station': 'ABCD', 'km': 8.0, 'time': 0.0}
+    NORDIC = {'precip': 1.2, 'snow': False, 'thunder': None, 'source': 'met_radar',
+              'air': {'temp': 7.0, 'humidity': 85, 'wind_speed': 6.0, 'wind_dir': 150.0}}
+
     def setUp(self):
-        self.saved = rain_now.SOURCES
+        self.saved = observed.nowcast, observed.rainviewer, observed.airport
 
     def tearDown(self):
-        rain_now.SOURCES = self.saved
+        observed.nowcast, observed.rainviewer, observed.airport = self.saved
 
-    def test_first_covering_source_wins(self):
+    def use(self, nowcast=None, rv=None, field=None):
         calls = []
-        def src(name, result):
+        def stub(name, result):
             def f(lat, lon):
                 calls.append(name)
                 return result
             return f
-        rain_now.SOURCES = (src('nordic', None), src('radar', WET), src('airport', DRY))
-        self.assertEqual(rain_now.observe(0, 0), WET)
-        self.assertEqual(calls, ['nordic', 'radar'])     # the airport isn't even asked
+        observed.nowcast, observed.rainviewer, observed.airport = (
+            stub('nowcast', nowcast), stub('rainviewer', rv), stub('airport', field))
+        return calls
 
-    def test_nothing_covers(self):
-        rain_now.SOURCES = (lambda lat, lon: None,)
-        self.assertIsNone(rain_now.observe(0, 0))
+    def test_nordic_radar_gives_rain_and_air(self):
+        calls = self.use(nowcast=self.NORDIC, rv=WET, field=self.FIELD)
+        o = observed.observe(60, 10)
+        self.assertEqual((o['rain']['source'], o['rain']['precip']), ('met_radar', 1.2))
+        self.assertEqual(o['air']['source'], 'met_radar')
+        self.assertEqual(o['sky']['source'], 'airport')               # clouds still from the airport
+        self.assertTrue(o['rain']['thunder'])                         # lightning from the airport
+        self.assertNotIn('rainviewer', calls)
 
-    def test_order_is_most_accurate_first(self):
-        self.assertEqual([f.__name__ for f in self.saved], ['met_nowcast', 'rainviewer', '_airport'])
+    def test_radar_elsewhere_airport_for_sky_and_air(self):
+        self.use(rv=WET, field=self.FIELD)
+        o = observed.observe(48, 2)
+        self.assertEqual((o['rain']['source'], o['sky']['source'], o['air']['source']),
+                         ('rainviewer', 'airport', 'airport'))
+        self.assertEqual(o['station'], ('ABCD', 8.0))
+
+    def test_airport_only(self):
+        self.use(field=self.FIELD)
+        self.assertEqual(observed.observe(6, 1)['rain']['source'], 'airport')
+
+    def test_nothing_observed(self):
+        self.use()
+        self.assertEqual(observed.observe(0, 0), {'rain': None, 'sky': None, 'air': None, 'station': None})
 
     def test_nordic_radar_isnt_asked_elsewhere(self):
         self.assertIsNone(radar.met_nowcast(6.1, 1.2))      # returns before any request
@@ -116,7 +167,10 @@ class RadarTest(unittest.TestCase):
 
 class MetarParseTest(unittest.TestCase):
     def test_dry_report(self):
-        self.assertEqual(parse(METAR_DRY), {'precip': 0.0, 'snow': False, 'thunder': False})
+        o = parse(METAR_DRY)
+        self.assertEqual((o['precip'], o['thunder'], o['temp'], o['humidity']), (0.0, False, 32.0, 67))
+        self.assertEqual((o['wind_dir'], o['wind_speed']), (190.0, 5.1))
+        self.assertEqual((o['layers'], o['auto'], o['sensed_top']), ([(19, 1700)], False, 99999))
 
     def test_garbled_report_is_rejected(self):
         self.assertIsNone(parse(METAR_GARBLED))
@@ -140,6 +194,30 @@ class MetarParseTest(unittest.TestCase):
         base = 'METAR ABCD 251300Z 19011KT 9999 {} 26/24 Q1011'
         for tail in ('VCSH', 'RERA', 'NOSIG TEMPO RA', 'RMK RAB05'):
             self.assertEqual(parse(base.format(tail))['precip'], 0.0, tail)
+
+    def test_wind_units_variable_and_calm(self):
+        base = 'METAR ABCD 251300Z {} 9999 FEW020 10/05 Q1011'
+        self.assertEqual(parse(base.format('27010MPS'))['wind_speed'], 10.0)
+        self.assertEqual(parse(base.format('27036KMH'))['wind_speed'], 10.0)
+        self.assertEqual(parse(base.format('27020G35KT'))['wind_speed'], 10.3)
+        self.assertIsNone(parse(base.format('VRB03KT'))['wind_dir'])
+        self.assertIsNone(parse(base.format('00000KT'))['wind_dir'])
+
+    def test_freezing_temperatures(self):
+        o = parse('METAR ABCD 251300Z 01005KT 9999 FEW020 M02/M05 Q1030')
+        self.assertEqual(o['temp'], -2.0)
+        self.assertAlmostEqual(o['humidity'], 80, delta=1)
+
+    def test_sky_rules(self):
+        model = (60, 40, 10)
+        sky = lambda raw: metar.sky(parse('METAR ABCD 251300Z 01005KT 9999 ' + raw + ' 10/05 Q1011'), model)
+        self.assertEqual(sky('FEW017'), (19, 0, 0))                # an observer reports every layer
+        self.assertEqual(sky('FEW008 SCT030CB OVC090'), (44, 100, 0))
+        self.assertEqual(sky('SKC'), (0, 0, 0))
+        self.assertEqual(sky('CAVOK'), (0, 40, 10))                # nothing below 5,000 ft; above unknown
+        self.assertEqual(sky('AUTO NCD'), (0, 40, 10))             # a ceilometer sees ~12,000 ft
+        self.assertEqual(sky('AUTO BKN100'), (0, 75, 10))
+        self.assertEqual(sky('VV002'), (100, 0, 0))                # fog hides the sky
 
 
 class MetarNearestTest(unittest.TestCase):

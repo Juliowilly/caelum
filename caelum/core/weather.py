@@ -1,5 +1,6 @@
 """Weather fetching (Open-Meteo, MET Norway) and merging."""
 
+from . import metar
 from .net import coord, get_json
 
 _NO_CLOUDS = {
@@ -171,9 +172,10 @@ def fetch_met_norway(lat, lon):
 
 def merge_weather(om, met, obs=None):
     """
-    Merge Open-Meteo + MET Norway, taking the best of each source. `obs` is the best available
-    observation of precipitation now (rain_now.observe: radar or an airport); when there is
-    one, it decides whether it is raining, otherwise the forecasts do.
+    Merge Open-Meteo + MET Norway, taking the best of each source. `obs` is what is observed
+    now (observed.observe): each part it has (rain, sky, air) replaces the forecasts' values.
+    result['sources'] tells where rain, sky and air came from:
+    met_radar | rainviewer | airport | met_forecast | om_forecast | models.
     """
     if om is None and met is None:
         return None
@@ -210,21 +212,54 @@ def merge_weather(om, met, obs=None):
         result['daily_forecast']  = met.get('daily_forecast', [])
         # Combined timestamp for smart-skip: update when either source changes
         result['ts'] = (om.get('ts', '') if om else '') + '|' + met.get('ts', '')
-    # Where "is it raining now" came from: met_radar | rainviewer | airport | met_forecast | om_forecast
-    result['rain_source'] = 'met_forecast' if met is not None else 'om_forecast'
-    result['rain_station'] = None
-    if obs is not None:
+    # Until an observation replaces them, everything comes from the forecasts
+    forecast = 'met_forecast' if met is not None else 'om_forecast'
+    result['sources'] = {'rain': forecast, 'sky': 'models' if om and met else forecast,
+                         'air': 'met_forecast' if met is not None else None}
+    result['station'] = None
+    obs = obs or {}
+    rain, sky, air = obs.get('rain'), obs.get('sky'), obs.get('air')
+    if rain is not None:
         # Observed beats forecast: the models often miss (or invent) a shower
-        result['precip'] = obs['precip']
-        result['snow']   = obs['snow']
-        result['wmo']    = _observed_wmo(obs, result['wmo'])
-        result['rain_source'] = obs['source']
-        if obs['source'] == 'airport':
-            result['rain_station'] = (obs['station'], obs['km'])
-        result['ts']    += f"|{obs['source']}:{obs['precip']}"
+        result['precip'] = rain['precip']
+        result['snow']   = rain['snow']
+        result['wmo']    = _observed_wmo(rain, result['wmo'])
+        result['sources']['rain'] = rain['source']
+    if sky is not None:
+        # The airport's layers, the models' for what its report can't see (high cloud, often)
+        model = (result['low'], result['mid'], result['high'])
+        if model == (0, 0, 0) and result['total'] > 0:
+            model = (0, result['total'], 0)             # MET alone has no layer split
+        result['low'], result['mid'], result['high'] = metar.sky(sky, model)
+        result['total'] = max(result['low'], result['mid'], result['high'])
+        result['sources']['sky'] = sky['source']
+        if result['wmo'] <= 3:                          # clear … overcast, as observed
+            t = result['total']
+            result['wmo'] = 0 if t < 10 else 1 if t < 40 else 2 if t < 75 else 3
+    if air is not None:
+        for k in ('temp', 'humidity', 'wind_speed'):
+            if air.get(k) is not None:
+                result[k] = air[k]
+        if air.get('wind_dir') is not None:             # variable or calm: keep the model's
+            result['wind_dir'] = air['wind_dir']
+        result['sources']['air'] = air['source']
+    if sky is not None or rain is not None:
+        result['symbol'] = _WMO_SYMBOL.get(result['wmo'], result['symbol'])   # the badge icon
+    if obs.get('station') and 'airport' in result['sources'].values():
+        result['station'] = obs['station']
+    if obs:
+        result['ts'] += '|' + repr(sorted((k, repr(v)) for k, v in obs.items()))
     if result['precip'] > 0 and result['total'] == 0:
         result['total'] = 60; result['low'] = 60
     return result
+
+
+# Observed WMO code → MET Norway symbol (the icon set the cards draw)
+_WMO_SYMBOL = {
+    0: 'clearsky', 1: 'fair', 2: 'partlycloudy', 3: 'cloudy',
+    51: 'lightrain', 53: 'lightrain', 61: 'lightrain', 63: 'rain', 65: 'heavyrain',
+    71: 'lightsnow', 73: 'snow', 75: 'heavysnow', 95: 'rainandthunder', 99: 'heavyrainandthunder',
+}
 
 
 def _observed_wmo(obs, model_wmo):

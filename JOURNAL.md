@@ -1295,3 +1295,40 @@ thick low cloud: 80% cirrus alone left the sun at ~33% and greyed the sky with t
 - Tests made location-neutral (generic station ABCD; the garbled report kept as an anonymised
   example). New tests: selector order and short-circuit, no Nordic request elsewhere, dBZ→rate,
   PNG reader (straight alpha, edge clipping), palette sanity, airport naming. 68 pass.
+
+### Clouds, temperature and wind observed too (unreleased)
+
+The user asked whether the rain approach could cover the other weather data. Each kind of data now
+comes from the best observation that covers the place, with the forecasts as the fallback.
+
+- `caelum/core/observed.py` replaces `rain_now.py`. `observe(lat, lon)` returns
+  `{rain, sky, air, station}`, each part None when nothing observes it:
+  - rain: Nowcast → RainViewer → airport (as before);
+  - sky: the nearest airport's cloud layers;
+  - air (temperature, humidity, wind): Nowcast (its station measurements) → airport.
+  - When radar gives the rain, the airport still says whether there is thunder.
+- `metar.parse` now also reads wind (KT/MPS/KMH; VRB or calm → no direction), temperature/dew point
+  (humidity with Magnus), cloud layers, VV (fog = overcast at the ground), AUTO and the clear-sky
+  groups.
+  - `sensed_top` is how high the report vouches for the sky: manned 99,999 ft; AUTO/CLR/NCD
+    12,000 ft (ceilometer); CAVOK/NSC 5,000 ft; SKC everything.
+- `metar.sky(obs, model)`: cover per layer (low < 6,500 ft, mid < 20,000 ft, high above). FEW 19,
+  SCT 44, BKN 75, OVC 100 %. A layer the report can't vouch for (less than half of it in sight,
+  and no reported cloud in it) keeps the model's value: e.g. cirrus over an automatic station.
+- `merge_weather(om, met, obs)`:
+  - `sources = {rain, sky, air}` and `station` replace `rain_source` / `rain_station`;
+  - rain is applied before sky, so a dry observation of a forecast shower gets its clear/fair/
+    cloudy code from the observed clouds (found by a test: it showed "cloudy" under a FEW sky);
+  - the badge symbol follows the observed code;
+  - a variable wind keeps the model's direction.
+- Settings → Location → Weather Data: three rows (Rain now, Clouds now, Temperature & wind) plus a
+  note under the group. fr/es/de/pt/it strings added.
+- **Live check, 25 Oct ~13:45 UTC**:
+  - Lomé: rain, clouds and air from DXXX (5 km): FEW017, 32 °C.
+  - Oslo: rain and air from MET Nowcast; no clouds (ENGM is ~35 km away), so the models give them.
+  - London (EGLL), Paris (LFPB), New York (KJRB), Tokyo (RJTT): rain from RainViewer, clouds and air
+    from the airport. Nairobi: everything from HKJK (12 km).
+  - The first run got nothing for Paris and Tokyo: one aviationweather.gov request failed in a
+    burst of requests. The window retries every 10 min.
+- Tests: observe() order and fallbacks, wind units, freezing temperatures, the sky rules, merge
+  of sky and air. 75 pass.

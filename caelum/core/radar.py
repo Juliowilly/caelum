@@ -3,8 +3,9 @@ Precipitation measured by weather radar, where there is radar:
   - MET Norway Nowcast 2.0: radar + stations every 5 min, for the Nordic countries;
   - RainViewer: a worldwide composite of national radars (Europe, the Americas, Japan,
     Australia, parts of Asia and Africa…), read from its map tiles.
-Each returns {precip (mm/h), snow, thunder: None (radar can't tell), source: 'met_radar' | 'rainviewer'} or None when the
-place isn't covered or the request failed.
+Each returns {precip (mm/h), snow, thunder: None (radar can't tell), source: 'met_radar' |
+'rainviewer'} (Nowcast adds the measured air: temp, humidity, wind) or None when the place isn't
+covered or the request failed.
 """
 
 import functools
@@ -46,11 +47,15 @@ def met_nowcast(lat, lon):
             return None
         now = props['timeseries'][0]['data']['instant']['details']
         rate = float(now['precipitation_rate'])
-        temp = float(now.get('air_temperature', 5.0))
+        temp = float(now['air_temperature'])
+        air = {'temp': temp, 'humidity': float(now['relative_humidity']),
+               'wind_speed': float(now['wind_speed']), 'wind_dir': float(now['wind_from_direction'])}
     except Exception:
         return None
+    # Nowcast's temperature and wind are station measurements spread over the map, so they
+    # come along as observed too
     return {'precip': rate, 'snow': rate > 0 and temp <= 1.0, 'thunder': None,
-            'source': 'met_radar'}
+            'source': 'met_radar', 'air': air}
 
 
 # ─── RainViewer (worldwide radar composite) ──────────────────────────────────

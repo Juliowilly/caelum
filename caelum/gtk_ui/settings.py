@@ -84,8 +84,11 @@ def _separator_header(row, before):
     if before is not None and row.get_header() is None:
         row.set_header(Gtk.Separator())
 
-def _group(page, title):
-    """A titled boxed list, GNOME-settings style; returns the ListBox to add rows to."""
+def _group(page, title, note=None):
+    """
+    A titled boxed list, GNOME-settings style, with an optional dim note under it; returns the
+    ListBox to add rows to.
+    """
     head = Gtk.Label(xalign=0)
     head.set_markup(f'<b>{GLib.markup_escape_text(title)}</b>')
     head.set_margin_top(14)
@@ -97,6 +100,14 @@ def _group(page, title):
     frame = Gtk.Frame()
     frame.add(lb)
     page.pack_start(frame, False, False, 0)
+    if note:
+        sub = Gtk.Label(xalign=0)
+        sub.set_markup(f'<small>{GLib.markup_escape_text(note)}</small>')
+        sub.set_line_wrap(True)
+        sub.set_max_width_chars(60)
+        sub.set_margin_top(6)
+        sub.get_style_context().add_class('dim-label')
+        page.pack_start(sub, False, False, 0)
     return lb
 
 def _row(lb, title, widget=None, subtitle=None, stacked=False):
@@ -297,11 +308,14 @@ class SettingsDialog(Gtk.Window):
         btn.connect('clicked', self._save)
         page.pack_start(btn, False, False, 0)
 
-        lb = _group(page, _t('Weather Data'))
-        _row(lb, _t('Rain now'), Gtk.Label(label=self._rain_source_text(), xalign=1, wrap=True,
-                                          max_width_chars=28),
-             _t('Caelum uses the most accurate free source for your location: weather radar, '
-                'else the nearest airport, else the forecast'))
+        lb = _group(page, _t('Weather Data'),
+                    _t('For each kind of data, Caelum uses the most accurate free source for your '
+                       'location: measurements (weather radar, the nearest airport) when there are '
+                       'some, else the forecast'))
+        for title, kind in ((_t('Rain now'), 'rain'), (_t('Clouds now'), 'sky'),
+                            (_t('Temperature & wind'), 'air')):
+            _row(lb, title, Gtk.Label(label=self._source_text(kind), xalign=1, wrap=True,
+                                      max_width_chars=30))
 
         lb = _group(page, _t('Facing & Compass'))
         hw_cmp = getattr(self.par, '_has_compass', False)
@@ -407,15 +421,19 @@ class SettingsDialog(Gtk.Window):
         save_config(self.cfg)
         self.par.da.queue_draw()
 
-    def _rain_source_text(self):
+    def _source_text(self, kind):
+        """Where the current rain / sky / air data comes from, for the Weather Data group."""
         clouds = getattr(self.par, '_clouds', {}) or {}
-        src = clouds.get('rain_source')
-        if src == 'airport' and clouds.get('rain_station'):
-            station, km = clouds['rain_station']
+        src = (clouds.get('sources') or {}).get(kind)
+        if src == 'airport' and clouds.get('station'):
+            station, km = clouds['station']
             return _t('Airport {station}, {km} km away').format(station=station, km=round(km))
+        if src == 'met_radar' and kind == 'air':
+            return _t('Measurements (MET Norway)')
         return {'met_radar': _t('Radar (MET Norway)'), 'rainviewer': _t('Radar (RainViewer)'),
                 'met_forecast': _t('Forecast (MET Norway)'),
-                'om_forecast': _t('Forecast (Open-Meteo)')}.get(src, _t('Not known yet'))
+                'om_forecast': _t('Forecast (Open-Meteo)'),
+                'models': _t('Forecast (MET Norway + Open-Meteo)')}.get(src, _t('Not known yet'))
 
     def _detect_location(self, _btn):
         self._det_status.set_text('Detecting...')

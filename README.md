@@ -149,8 +149,10 @@ Settings are saved to `~/.config/caelum/config.json` (an older `config.json` nex
 
 | Data | Source |
 |---|---|
-| Weather (clouds, temp, wind, forecast) | [Open-Meteo](https://open-meteo.com) + [MET Norway](https://api.met.no) |
+| Forecast, and the weather now where nothing observes it | [Open-Meteo](https://open-meteo.com) + [MET Norway](https://api.met.no) |
 | Is it raining now? | The most accurate free source covering your location, in this order: weather radar ([MET Norway Nowcast](https://api.met.no/weatherapi/nowcast/2.0/documentation) in the Nordic countries, [RainViewer](https://www.rainviewer.com/api.html) elsewhere), else the nearest airport's observations (METAR within 30 km, via [aviationweather.gov](https://aviationweather.gov/data/api/)), else the forecast (MET Norway, then Open-Meteo). Settings → Location → Weather Data shows which one is in use |
+| Clouds now | The nearest airport's reported cloud layers (METAR within 30 km); the models fill in the layers an automatic station can't see (usually high cloud) |
+| Temperature, humidity, wind now | MET Norway Nowcast in the Nordic countries, else the nearest airport, else the forecast |
 | Astronomy | Meeus *Astronomical Algorithms* |
 | City name | [Nominatim](https://nominatim.openstreetmap.org) (OpenStreetMap) |
 | Settings → Detect location | [ipwho.is](https://ipwho.is), falling back to [ipapi.co](https://ipapi.co) (only when you click it) |
