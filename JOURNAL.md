@@ -1128,3 +1128,36 @@ thick low cloud: 80% cirrus alone left the sun at ~33% and greyed the sky with t
   - `landscape_light` darkens wet ground by up to 15 % (full at 2 mm/h).
 - `precip_intensity` and `rain_slant` live in `core/sky.py` so they can be tested without cairo.
   The old `_draw_rain` is gone. 4 new tests (38 in total); pyflakes clean.
+
+### Security review and fixes (unreleased)
+- **Question**: does the app put its users at risk? I reviewed every network call, file write,
+  D-Bus/device access and the packaging permissions.
+- **Already sound**:
+  - No subprocess, shell, `eval` or pickle anywhere; network replies and the config are parsed as JSON only.
+  - It writes only its config, the exported wallpaper PNG in the cache dir, and the autostart entry.
+    The autostart entry is built from the app's own path, never from network data.
+  - The snap is strict (`network`, `gsettings`); the flatpak has network, display and dri, with no
+    filesystem access.
+  - Key events are only seen while Caelum has focus, and nothing is logged.
+- **Fixed**:
+  1. Detect location used **plain-HTTP** `ip-api.com`, whose free tier has no TLS. Anyone on the
+     network path could read the request or forge the reply. The forged timezone name would then go
+     unescaped into `set_markup`, i.e. Pango markup injection.
+     - New `core/geoip.py`: ipwho.is over HTTPS, with ipapi.co as fallback.
+     - Replies are validated: numeric lat/lon in range, offset within ±14 h, timezone name capped at
+       64 characters. Otherwise the reply is rejected.
+     - The name is escaped before display.
+  2. Coordinates went to Open-Meteo, MET Norway and Nominatim with 4 decimals (~11 m: a house).
+     `core/net.coord()` now rounds to 2 decimals (~1 km). Checked live: same weather, and Nominatim
+     still says "Lomé, Togo".
+  3. The compass status label (which can carry serial exception text) is now escaped too.
+  4. New **`core/net.get_json`**: refuses non-HTTPS URLs, sends the versioned User-Agent everywhere,
+     and caps replies at 4 MB. All 4 lookups use it. `urllib`/`json` are gone from the GTK modules.
+  5. **`make checksums`** writes `dist/SHA256SUMS` for the deb, flatpak and snap. It was uploaded to
+     the v1.4.0 release (hashes match the assets), and the README tells users how to check.
+  6. The "phone compass URL" feature no longer exists in the app. I removed `compass_bridge.py`, its
+     README section (which told users to open PhyPhox's unencrypted remote access), and the stale
+     snap/flatpak permission comments.
+  7. README: services listed, plus a Privacy note (HTTPS only, 2-decimal coordinates, no statistics).
+- 7 new tests (`tests/test_net.py`): rounding, HTTP refused, both geo-IP parsers and their
+  rejections. 45 pass; pyflakes clean.

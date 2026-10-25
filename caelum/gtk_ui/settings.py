@@ -1,8 +1,6 @@
 """Settings dialog."""
 
-import json
 import threading
-import urllib.request
 
 import gi
 gi.require_version('Gtk', '3.0')
@@ -10,6 +8,7 @@ from gi.repository import GLib, GObject, Gtk
 
 from .. import __version__
 from ..core.config import DEFAULT_CONFIG, save_config
+from ..core.geoip import detect_location
 from ..core.i18n import _LANG_OPTIONS, _set_lang, _t
 from .autostart import autostart_enabled, set_autostart
 from .landscape import available as available_landscapes
@@ -314,7 +313,7 @@ class SettingsDialog(Gtk.Window):
 
         cmp_stat = getattr(self.par, '_compass_status', 'Not detected')
         self._cmp_status_lbl = Gtk.Label(xalign=1)
-        self._cmp_status_lbl.set_markup(f'<b>{cmp_stat}</b>')
+        self._cmp_status_lbl.set_markup(f'<b>{GLib.markup_escape_text(cmp_stat)}</b>')
         _row(lb, _t('Compass sensor'), self._cmp_status_lbl)
 
         self._e_compass_port = Gtk.Entry()
@@ -387,7 +386,7 @@ class SettingsDialog(Gtk.Window):
         if self.par._has_compass:
             GLib.timeout_add(500, self.par._poll_compass)
         status = getattr(self.par, '_compass_status', 'Not detected')
-        self._cmp_status_lbl.set_markup(f'<b>{status}</b>')
+        self._cmp_status_lbl.set_markup(f'<b>{GLib.markup_escape_text(status)}</b>')
         self.par.da.queue_draw()
 
     def _on_facing_changed(self, combo):
@@ -406,10 +405,8 @@ class SettingsDialog(Gtk.Window):
         self._det_status.set_text('Detecting...')
         def _work():
             try:
-                url = 'http://ip-api.com/json/?fields=status,lat,lon,timezone,offset'
-                with urllib.request.urlopen(url, timeout=10) as r:
-                    data = json.loads(r.read().decode())
-                if data.get('status') == 'success':
+                data = detect_location()
+                if data:
                     GLib.idle_add(self._apply_location, data)
                 else:
                     GLib.idle_add(self._det_status.set_text, 'Detection failed')
@@ -418,10 +415,9 @@ class SettingsDialog(Gtk.Window):
         threading.Thread(target=_work, daemon=True).start()
 
     def _apply_location(self, data):
-        lat    = data.get('lat', 6.1375)
-        lon    = data.get('lon', 1.2123)
-        offset = data.get('offset', 0) / 3600.0
-        tz_name = data.get('timezone', '')
+        lat, lon = data['lat'], data['lon']
+        offset   = data['offset'] / 3600.0
+        tz_name  = GLib.markup_escape_text(data['timezone'])
         self._e_latitude.set_text(f'{lat:.4f}')
         self._e_longitude.set_text(f'{lon:.4f}')
         self._tz_combo.set_active(_tz_index(offset))

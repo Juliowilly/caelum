@@ -2,13 +2,11 @@
 
 import datetime
 import glob
-import json
 import math
 import os
 import random
 import threading
 import time
-import urllib.request
 
 import gi
 gi.require_version('Gtk', '3.0')
@@ -34,6 +32,7 @@ from ..core.sky import (
 from ..core.weather import (
     _NO_CLOUDS, _WX_ACCENT, _WX_LABEL, fetch_met_norway, fetch_open_meteo, merge_weather,
 )
+from ..core.net import coord, get_json
 from .clouds import (
     _soft_puff, draw_altocumulus, draw_cirrus, draw_cumulus, draw_deck, draw_mid_sheet,
 )
@@ -139,7 +138,7 @@ class SkyTracker(Gtk.Window):
 
         self._has_compass  = False
         self._compass_dev  = None
-        self._compass_src  = None   # 'iio' | 'dbus' | 'serial' | 'url'
+        self._compass_src  = None   # 'iio' | 'dbus' | 'serial'
         self._compass_status = 'Not detected'
 
         # Method 1: IIO sysfs (works without any daemon)
@@ -400,13 +399,9 @@ class SkyTracker(Gtk.Window):
         lon = self.cfg['longitude']
         def _work():
             try:
-                url = (f"https://nominatim.openstreetmap.org/reverse"
-                       f"?format=json&lat={lat:.4f}&lon={lon:.4f}&zoom=10")
-                req = urllib.request.Request(url, headers={
-                    'User-Agent': 'caelum/1.0 github.com/Juliowilly/caelum'
-                })
-                with urllib.request.urlopen(req, timeout=8) as r:
-                    data = json.loads(r.read())
+                data = get_json(f"https://nominatim.openstreetmap.org/reverse"
+                                f"?format=json&lat={coord(lat)}&lon={coord(lon)}&zoom=10",
+                                timeout=8)
                 addr = data.get('address', {})
                 city = (addr.get('city') or addr.get('town') or
                         addr.get('village') or addr.get('municipality') or

@@ -36,9 +36,12 @@ A native desktop widget that turns your screen background into a live, photoreal
 | **Flatpak** (any distro) | download `caelum-<version>.flatpak` from [Releases](https://github.com/Juliowilly/caelum/releases), then `flatpak install --user caelum-<version>.flatpak` |
 | **.deb** | download from [Releases](https://github.com/Juliowilly/caelum/releases), then `sudo apt install ./caelum_*_all.deb` |
 
-Inside Flatpak and Snap the hardware compass sensors (IIO, USB serial) are not available; the
-phone compass over the network works everywhere. Wallpaper export and autostart use the
+Inside Flatpak and Snap the hardware compass sensors (IIO, USB serial) are not available: pick
+the direction your screen faces in Settings instead. Wallpaper export and autostart use the
 desktop portals under Flatpak.
+
+Each release on GitHub has a `SHA256SUMS` file: download it next to the package and run
+`sha256sum -c --ignore-missing SHA256SUMS` to check the download.
 
 ### pipx
 
@@ -130,16 +133,6 @@ autostart, wallpaper export, version):
 
 Settings are saved to `~/.config/caelum/config.json` (an older `config.json` next to `desktop_tracker.py` is migrated automatically on first run).
 
-## Phone Compass (PhyPhox)
-
-1. Install [PhyPhox](https://phyphox.org) on your phone
-2. Start the Magnetometer experiment and enable Remote Access
-3. Run the bridge on your laptop (`compass_bridge.py` is in the source repository, not the .deb):
-   ```bash
-   python3 compass_bridge.py http://<phone-ip>:8080
-   ```
-4. In Settings → Phone compass URL: `http://localhost:8888/heading`
-
 ## Controls
 
 | Key / Action | Effect |
@@ -159,8 +152,13 @@ Settings are saved to `~/.config/caelum/config.json` (an older `config.json` nex
 | Weather (clouds, rain, temp) | [Open-Meteo](https://open-meteo.com) + [MET Norway](https://api.met.no) |
 | Astronomy | Meeus *Astronomical Algorithms* |
 | City name | [Nominatim](https://nominatim.openstreetmap.org) (OpenStreetMap) |
+| Settings → Detect location | [ipwho.is](https://ipwho.is), falling back to [ipapi.co](https://ipapi.co) (only when you click it) |
 
-All sources are free and require no API key.
+All sources are free and require no API key or account.
+
+**Privacy**: all requests use HTTPS. The weather and city-name services receive your coordinates
+rounded to 2 decimals (about 1 km), never more precise. Nothing else about you is sent, and Caelum
+collects no statistics.
 
 ## License
 

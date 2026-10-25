@@ -1,4 +1,4 @@
-.PHONY: run test deb snap flatpak flatpak-bundle wheel clean
+.PHONY: run test deb snap flatpak flatpak-bundle checksums wheel clean
 
 run:
 	python3 -m caelum
@@ -24,6 +24,14 @@ flatpak-bundle:
 	flatpak build-bundle --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo \
 		build/flatpak-repo dist/caelum-$$(python3 -c 'import caelum; print(caelum.__version__)').flatpak \
 		io.github.juliowilly.Caelum master
+
+# SHA256SUMS of the release files (deb, snap, flatpak), uploaded with them so downloads can be
+# checked with `sha256sum -c --ignore-missing SHA256SUMS`
+checksums:
+	V=$$(python3 -c 'import caelum; print(caelum.__version__)'); \
+	{ (cd dist && sha256sum caelum_$$V-1_all.deb caelum-$$V.flatpak) && sha256sum caelum_$${V}_amd64.snap; } \
+		> dist/SHA256SUMS
+	cat dist/SHA256SUMS
 
 wheel:
 	python3 -m pip wheel --no-deps --no-build-isolation -w dist .

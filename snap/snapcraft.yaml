@@ -34,7 +34,7 @@ apps:
     autostart: caelum.desktop
     extensions: [gnome]
     plugs:
-      - network        # weather, geolocation, phone compass URL
+      - network        # weather, place name, location detection
       - gsettings      # wallpaper / lock-screen export
     environment:
       PYTHONPATH: $SNAP/usr/lib/python3/dist-packages

@@ -1,7 +1,6 @@
 """Weather fetching (Open-Meteo, MET Norway) and merging."""
 
-import json
-import urllib.request
+from .net import coord, get_json
 
 _NO_CLOUDS = {
     'total': 0, 'low': 0, 'mid': 0, 'high': 0,
@@ -55,12 +54,11 @@ _WMO_PRECIP = {
 def fetch_open_meteo(lat, lon):
     """Fetch cloud layers and precipitation from Open-Meteo (no key needed)."""
     url = (f"https://api.open-meteo.com/v1/forecast"
-           f"?latitude={lat:.4f}&longitude={lon:.4f}"
+           f"?latitude={coord(lat)}&longitude={coord(lon)}"
            f"&current=cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high"
            f",precipitation,snowfall,weather_code")
     try:
-        with urllib.request.urlopen(url, timeout=8) as r:
-            data = json.loads(r.read())
+        data       = get_json(url, timeout=8)
         c          = data['current']
         code       = int(c.get('weather_code', 0))
         raw_precip = float(c.get('precipitation', 0.0))
@@ -94,13 +92,9 @@ _MET_SYMBOL_WMO = {
 def fetch_met_norway(lat, lon):
     """Fetch from MET Norway LocationForecast 2.0 (no API key — User-Agent required)."""
     url = (f"https://api.met.no/weatherapi/locationforecast/2.0/compact"
-           f"?lat={lat:.4f}&lon={lon:.4f}")
-    req = urllib.request.Request(url, headers={
-        'User-Agent': 'caelum/1.0 https://github.com/Juliowilly/caelum'
-    })
+           f"?lat={coord(lat)}&lon={coord(lon)}")
     try:
-        with urllib.request.urlopen(req, timeout=10) as r:
-            data = json.loads(r.read())
+        data    = get_json(url, timeout=10)
         series  = data['properties']['timeseries']
         entry   = series[0]
         ts      = entry['time']
