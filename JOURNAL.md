@@ -1088,3 +1088,6 @@ thick low cloud: 80% cirrus alone left the sun at ~33% and greyed the sky with t
   - PPA 1.4.0-1 uploaded for noble and resolute.
   - Snap revision 6 → **beta**. 1.3.1 (rev 5) is also beta-only. Stable stays at 1.3.0 (rev 4)
     until the user tests the beta.
+- The user tested the beta. Snap rev 5 (1.3.1), then rev 6 (1.4.0), promoted to **stable**.
+- **Next release**: rework the rain rendering, especially so it fits the landscapes and the new
+  opaque background (the user's request).
