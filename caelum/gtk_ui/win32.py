@@ -162,7 +162,7 @@ def place_sky(hwnd):
 
 # ─── The sky behind the icons ────────────────────────────────────────────────
 
-_WM_PAINT, _WM_ERASEBKGND = 0x000F, 0x0014
+_WM_ERASEBKGND = 0x0014
 _SW_HIDE = 0
 _WNDPROC = ctypes.WINFUNCTYPE(_LONG_PTR, wintypes.HWND, wintypes.UINT, wintypes.WPARAM,
                               wintypes.LPARAM)
@@ -172,15 +172,28 @@ user32.CreateWindowExW.restype = wintypes.HWND
 user32.CreateWindowExW.argtypes = [wintypes.DWORD, wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.DWORD,
                                    ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
                                    wintypes.HWND, wintypes.HMENU, wintypes.HINSTANCE, wintypes.LPVOID]
-user32.GetDC.restype = wintypes.HDC
-user32.GetDC.argtypes = [wintypes.HWND]
-user32.ReleaseDC.argtypes = [wintypes.HWND, wintypes.HDC]
-user32.BeginPaint.restype = wintypes.HDC
 user32.DestroyWindow.argtypes = [wintypes.HWND]
 user32.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
-gdi32.SetDIBitsToDevice.argtypes = [wintypes.HDC, ctypes.c_int, ctypes.c_int, wintypes.DWORD,
-                                    wintypes.DWORD, ctypes.c_int, ctypes.c_int, wintypes.UINT,
-                                    wintypes.UINT, ctypes.c_void_p, ctypes.c_void_p, wintypes.UINT]
+_ULW_ALPHA, _AC_SRC_ALPHA = 0x2, 0x1
+gdi32.CreateCompatibleDC.restype = wintypes.HDC
+gdi32.CreateCompatibleDC.argtypes = [wintypes.HDC]
+gdi32.CreateDIBSection.restype = wintypes.HBITMAP
+gdi32.CreateDIBSection.argtypes = [wintypes.HDC, ctypes.c_void_p, wintypes.UINT,
+                                   ctypes.POINTER(ctypes.c_void_p), wintypes.HANDLE, wintypes.DWORD]
+gdi32.SelectObject.restype = wintypes.HGDIOBJ
+gdi32.SelectObject.argtypes = [wintypes.HDC, wintypes.HGDIOBJ]
+gdi32.DeleteDC.argtypes = [wintypes.HDC]
+
+
+class _BLENDFUNCTION(ctypes.Structure):
+    _fields_ = [('BlendOp', ctypes.c_ubyte), ('BlendFlags', ctypes.c_ubyte),
+                ('SourceConstantAlpha', ctypes.c_ubyte), ('AlphaFormat', ctypes.c_ubyte)]
+
+
+user32.UpdateLayeredWindow.argtypes = [wintypes.HWND, wintypes.HDC, ctypes.POINTER(wintypes.POINT),
+                                       ctypes.POINTER(wintypes.SIZE), wintypes.HDC,
+                                       ctypes.POINTER(wintypes.POINT), wintypes.COLORREF,
+                                       ctypes.POINTER(_BLENDFUNCTION), wintypes.DWORD]
 _kernel32 = ctypes.WinDLL('kernel32')
 _kernel32.GetModuleHandleW.restype = wintypes.HMODULE
 
@@ -202,25 +215,16 @@ class _BITMAPINFOHEADER(ctypes.Structure):
                 ('biClrUsed', wintypes.DWORD), ('biClrImportant', wintypes.DWORD)]
 
 
-class _PAINTSTRUCT(ctypes.Structure):
-    _fields_ = [('hdc', wintypes.HDC), ('fErase', wintypes.BOOL), ('rcPaint', wintypes.RECT),
-                ('fRestore', wintypes.BOOL), ('fIncUpdate', wintypes.BOOL),
-                ('rgbReserved', ctypes.c_byte * 32)]
-
-
-user32.BeginPaint.argtypes = [wintypes.HWND, ctypes.POINTER(_PAINTSTRUCT)]
-user32.EndPaint.argtypes = [wintypes.HWND, ctypes.POINTER(_PAINTSTRUCT)]
-
-
 class DesktopCanvas:
     """
     A plain Win32 window behind the desktop icons that shows the sky's frames, rendered off screen
-    with Cairo (the frame's ARGB32 rows are the 32-bit top-down DIB that GDI copies as they are).
+    with Cairo. Frames go in with UpdateLayeredWindow: 24H2's desktop is composited and ignored
+    pixels drawn into the window (GetDC/WM_PAINT, then SetDIBitsToDevice). Cairo's ARGB32 is the premultiplied 32-bit
+    top-down DIB that UpdateLayeredWindow takes.
     """
     _CLASS = 'CaelumDesktopSky'
 
     def __init__(self):
-        self._frame = None
         self._blit_error = False
         self._proc = _WNDPROC(self._wndproc)    # keep a reference: Windows calls it
         hinst = _kernel32.GetModuleHandleW(None)
@@ -234,8 +238,16 @@ class DesktopCanvas:
                                            x, y, w, h, None, None, hinst, None)
         if not self.hwnd:
             raise ctypes.WinError(ctypes.get_last_error())
-        # Layered and fully opaque: 24H2's Progman is composited and only draws layered children
-        user32.SetLayeredWindowAttributes(self.hwnd, 0, 255, _LWA_ALPHA)
+        # One DIB section the frames are copied into, selected in a memory DC
+        bmi = _BITMAPINFOHEADER(biSize=ctypes.sizeof(_BITMAPINFOHEADER), biWidth=w, biHeight=-h,
+                                biPlanes=1, biBitCount=32)   # top-down, BI_RGB
+        self._bits = ctypes.c_void_p()
+        self._mem_dc = gdi32.CreateCompatibleDC(None)
+        self._bitmap = gdi32.CreateDIBSection(self._mem_dc, ctypes.byref(bmi), 0,
+                                              ctypes.byref(self._bits), None, 0)
+        if not self._bitmap:
+            raise ctypes.WinError(ctypes.get_last_error())
+        gdi32.SelectObject(self._mem_dc, self._bitmap)
 
     def place(self):
         """Behind the icons; False when there is no icon layer to go behind."""
@@ -271,42 +283,30 @@ class DesktopCanvas:
               file=sys.stderr, flush=True)
 
     def show(self, pixels, w, h, stride):
-        """Show a frame: Cairo ARGB32 pixels (a buffer of h rows of `stride` bytes)."""
-        self._frame = (bytes(pixels), w, h, stride)
-        hdc = user32.GetDC(self.hwnd)
-        try:
-            self._blit(hdc)
-        finally:
-            user32.ReleaseDC(self.hwnd, hdc)
+        """Show a frame: Cairo ARGB32 pixels, h rows of `stride` bytes (= w * 4 at this size)."""
+        if (w, h) != self.size or stride != w * 4:
+            return
+        ctypes.memmove(self._bits, bytes(pixels), stride * h)
+        size = wintypes.SIZE(w, h)
+        blend = _BLENDFUNCTION(0, 0, 255, _AC_SRC_ALPHA)   # AC_SRC_OVER, per-pixel alpha
+        ok = user32.UpdateLayeredWindow(self.hwnd, None, None, ctypes.byref(size), self._mem_dc,
+                                        ctypes.byref(wintypes.POINT(0, 0)), 0,
+                                        ctypes.byref(blend), _ULW_ALPHA)
+        if not ok and not self._blit_error:
+            self._blit_error = True      # once: the log would fill up 10 times a second
+            print(f'Caelum: desktop canvas: UpdateLayeredWindow failed '
+                  f'(error {ctypes.get_last_error()})', file=sys.stderr, flush=True)
 
     def destroy(self):
         user32.ShowWindow(self.hwnd, _SW_HIDE)
         user32.DestroyWindow(self.hwnd)
-
-    def _blit(self, hdc):
-        if not self._frame:
-            return
-        data, w, h, stride = self._frame
-        bmi = _BITMAPINFOHEADER(biSize=ctypes.sizeof(_BITMAPINFOHEADER), biWidth=stride // 4,
-                                biHeight=-h, biPlanes=1, biBitCount=32)   # top-down, BI_RGB
-        lines = gdi32.SetDIBitsToDevice(hdc, 0, 0, w, h, 0, 0, 0, h, data, ctypes.byref(bmi), 0)
-        if lines != h and not self._blit_error:
-            self._blit_error = True      # once: the log would fill up 10 times a second
-            print(f'Caelum: desktop canvas: SetDIBitsToDevice copied {lines} of {h} rows '
-                  f'(hdc {hdc}, error {ctypes.get_last_error()})', file=sys.stderr, flush=True)
+        gdi32.DeleteDC(self._mem_dc)
+        gdi32.DeleteObject(self._bitmap)
 
     def _wndproc(self, hwnd, msg, wparam, lparam):
-        try:
-            if msg == _WM_PAINT:
-                ps = _PAINTSTRUCT()
-                hdc = user32.BeginPaint(hwnd, ctypes.byref(ps))
-                self._blit(hdc)
-                user32.EndPaint(hwnd, ctypes.byref(ps))
-                return 0
-            if msg == _WM_ERASEBKGND:
-                return 1      # the next frame covers everything: no flash of the class brush
-        except Exception as e:
-            print(f'Caelum: desktop canvas: {e}', file=sys.stderr, flush=True)
+        # UpdateLayeredWindow keeps the picture: nothing to paint
+        if msg == _WM_ERASEBKGND:
+            return 1
         return user32.DefWindowProcW(hwnd, msg, wparam, lparam)
 
 

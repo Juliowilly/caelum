@@ -1657,3 +1657,10 @@ auto-hide, scaled to GTK pixels).
   - Click-through off: the GTK window itself, never reparented, over the icons.
   - Bisection switches removed. CI minimises all windows first and finds Settings by a title built
     from the em dash's code point.
+- Canvas run: **click-through off fully works** (sky repaints ~95 frames / 10 s; compass click
+  turned it east; the gear opened Settings; a click on the Display tab switched to it). Behind the
+  icons: frames drawn, the copy succeeded, the canvas sat right under SHELLDLL_DefView and over the
+  wallpaper's WorkerW, layered, yet the stock wallpaper showed. 24H2's composited desktop ignores
+  GDI drawing into the window, so frames now go in through UpdateLayeredWindow (a DIB section in a
+  memory DC; Cairo's premultiplied ARGB32 is its format). CI: Settings is found with
+  `[NullString]::Value` (PowerShell turns `$null` into "" for string parameters).
