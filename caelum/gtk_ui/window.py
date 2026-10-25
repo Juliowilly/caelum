@@ -777,7 +777,7 @@ class SkyTracker(Gtk.Window):
     # ── Sky background ───────────────────────────────────────────────────────
 
     def _draw_sky(self, cr, W, H, sun_el, sun_az, clouds, m_bright, star_vis=1.0,
-                  lat=6.14, lon=1.21, utc=None):
+                  lat=DEFAULT_CONFIG['latitude'], lon=DEFAULT_CONFIG['longitude'], utc=None):
         if self.cfg.get('opaque_sky', True) or self._exporting:
             # Paint the whole sky so the wallpaper doesn't show (the exported image always does)
             zen, hor, g_top, g_bot = opaque_sky(sun_el, clouds, m_bright)
@@ -962,7 +962,8 @@ class SkyTracker(Gtk.Window):
         cr.set_source(hrd)
         cr.fill()
 
-    def _draw_stars(self, cr, W, H, intensity, lat=6.14, lon=1.21, utc=None, m_bright=0.0):
+    def _draw_stars(self, cr, W, H, intensity, lat=DEFAULT_CONFIG['latitude'], lon=DEFAULT_CONFIG['longitude'],
+                    utc=None, m_bright=0.0):
         if utc is None:
             utc = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
         rng = random.Random(42)

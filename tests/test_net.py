@@ -6,7 +6,7 @@ from caelum.core.net import coord, get_json
 
 class CoordTest(unittest.TestCase):
     def test_two_decimals(self):
-        self.assertEqual(coord(6.137512), '6.14')
+        self.assertEqual(coord(48.858372), '48.86')
         self.assertEqual(coord(-33.86881), '-33.87')
 
     def test_no_negative_zero(self):
@@ -20,13 +20,13 @@ class GetJsonTest(unittest.TestCase):
 
 
 class GeoIpTest(unittest.TestCase):
-    WHOIS = {'success': True, 'latitude': 6.1287, 'longitude': 1.2215,
-             'timezone': {'id': 'Africa/Lome', 'offset': 0}}
+    WHOIS = {'success': True, 'latitude': 35.6895, 'longitude': 139.6917,
+             'timezone': {'id': 'Asia/Tokyo', 'offset': 32400}}
     IPAPI = {'latitude': 48.8566, 'longitude': 2.3522, 'timezone': 'Europe/Paris', 'utc_offset': '+0100'}
 
     def test_ipwhois(self):
         self.assertEqual(parse_ipwhois(self.WHOIS),
-                         {'lat': 6.1287, 'lon': 1.2215, 'timezone': 'Africa/Lome', 'offset': 0})
+                         {'lat': 35.6895, 'lon': 139.6917, 'timezone': 'Asia/Tokyo', 'offset': 32400})
 
     def test_ipapi_offset_string(self):
         self.assertEqual(parse_ipapi(self.IPAPI)['offset'], 3600)

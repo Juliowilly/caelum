@@ -20,8 +20,10 @@ def set_config_dir(path):
     CONFIG_PATH = os.path.join(path, 'config.json')
 
 DEFAULT_CONFIG = {
-    "latitude": 6.1375,
-    "longitude": 1.2123,
+    # Until the user sets their own: Lomé's public city-centre point, at the same ~1 km precision
+    # Caelum uses for every online lookup (never a precise address)
+    "latitude": 6.14,
+    "longitude": 1.22,
     "timezone_offset": 0,
     "aster_scale": 1.0,
     "cards": {

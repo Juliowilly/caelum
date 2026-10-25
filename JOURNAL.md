@@ -1223,7 +1223,7 @@ thick low cloud: 80% cirrus alone left the sun at ~33% and greyed the sky with t
   - `locationforecast`'s `instant` block (temperature, pressure, cloud, humidity, wind) has no
     precipitation. Rain only exists there as `next_1_hours`, a forecast.
   - So MET has no measured rain for Togo.
-  - The real observation available is **METAR** from Lomé airport (DXXX, 5.6 km away), every
+  - The real observation available is **METAR** from Lomé airport (DXXX), every
     30 min, free, no key, through aviationweather.gov's API.
   - Today 07:30–13:00 it reported no rain and FEW017. Both models said ~95 % cloud.
   - The 13:00 report was garbled: two METARs run together, `Q110`.
@@ -1283,12 +1283,12 @@ thick low cloud: 80% cirrus alone left the sun at ~33% and greyed the sky with t
   (the source stopped answering) is dropped, so the forecasts take over. It is cleared on
   location change.
 - **Settings → Location → Weather Data → "Rain now"** shows the source in use, e.g. "Airport DXXX,
-  6 km away" or "Radar (RainViewer)", with a one-line explanation. fr/es/de/pt/it strings added.
+  N km away" or "Radar (RainViewer)", with a one-line explanation. fr/es/de/pt/it strings added.
 - **Live check, 25 Oct ~13:40 UTC**:
   - Oslo and Bergen → MET radar. Bergen raining: 1.9 mm/h on MET, 1.28 on RainViewer; the others
     dry on both.
   - London, Paris, New York, Tokyo → RainViewer.
-  - Lomé → DXXX at 6 km. Nairobi → HKJK at 12 km.
+  - Lomé → DXXX. Nairobi → HKJK at 12 km.
   - About 0.5–2 s per lookup.
 - Packaging: `data/*.json` added to the package data. README: sources (RainViewer credited) and
   privacy (RainViewer only learns the ~300 km tile).
@@ -1324,7 +1324,7 @@ comes from the best observation that covers the place, with the forecasts as the
 - Settings → Location → Weather Data: three rows (Rain now, Clouds now, Temperature & wind) plus a
   note under the group. fr/es/de/pt/it strings added.
 - **Live check, 25 Oct ~13:45 UTC**:
-  - Lomé: rain, clouds and air from DXXX (5 km): FEW017, 32 °C.
+  - Lomé: rain, clouds and air from DXXX: FEW017, 32 °C.
   - Oslo: rain and air from MET Nowcast; no clouds (ENGM is ~35 km away), so the models give them.
   - London (EGLL), Paris (LFPB), New York (KJRB), Tokyo (RJTT): rain from RainViewer, clouds and air
     from the airport. Nairobi: everything from HKJK (12 km).
@@ -1432,9 +1432,9 @@ shipped landscapes look the same).
 ### Your own photo as landscape (unreleased)
 
 The user didn't want a landscape that exists only on their machine ("Any update must be global"),
-and asked for risks to be flagged first. I warned that shipping their yard photo would publish
-their home: the public repo's default location `6.1375, 1.2123` has 4 decimals (~11 m) and matches
-their own config. The user chose the general feature and said not to use their photos.
+and asked for risks to be flagged first. I warned that shipping a photo of a private place would
+publish it, and that the default location in the code was too precise (fixed in 1.5.4). The user
+chose the general feature and said not to use their photos.
 
 - **Settings → Sky → Your own photo**: "Choose…" opens the native file chooser (the file portal in
   the snap — `GTK_USE_PORTAL=1` there — and the Flatpak, so no new file permission is needed). The
@@ -1458,3 +1458,17 @@ their own config. The user chose the general feature and said not to use their p
 - Tests (tests/test_photo_landscape.py): build/install/remove, mask (sky at the top, ground at the
   bottom, mirrored), EXIF dropped, refusals (no sky, too small, not an image, too large). 83 pass.
 - Not shipped: the user's photos and the hand-installed "yard" from the previous step.
+
+### Location privacy (1.5.4)
+
+The user called this "very important". The code's default location had 4 decimals (~11 m).
+- Default → `6.14, 1.22`: Lomé's public city-centre point, at the same ~1 km precision Caelum
+  uses for every online lookup. Settings' fallback and the sky-drawing defaults now read
+  DEFAULT_CONFIG instead of repeating numbers.
+- Tests: the geoip sample is now Tokyo and the rounding example Paris.
+- JOURNAL scrubbed of the old point, distances from it, and the link to the user's home.
+- **Not removable:** the old values stay in the git history and in the released 1.0–1.5.3
+  packages. Erasing them would mean rewriting public history (force-push, broken tags and
+  releases), and copies already downloaded would remain. Not done; the user decides.
+- Existing installs keep whatever location their config saved; the default only applies to new
+  configs.

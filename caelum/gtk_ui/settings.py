@@ -420,8 +420,8 @@ class SettingsDialog(Gtk.Window):
         lb.add(det_row)
 
         for lbl, key, default in [
-            (_t('Latitude  (+N / -S)'), 'latitude',  6.1375),
-            (_t('Longitude (+E / -W)'), 'longitude', 1.2123),
+            (_t('Latitude  (+N / -S)'), 'latitude',  DEFAULT_CONFIG['latitude']),
+            (_t('Longitude (+E / -W)'), 'longitude', DEFAULT_CONFIG['longitude']),
         ]:
             e = Gtk.Entry()
             e.set_width_chars(12)
