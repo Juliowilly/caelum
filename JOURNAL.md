@@ -1426,3 +1426,5 @@ made from them stay on the user's machine: never in the repo or the packages.
 The user asked to release 1.5.3: personal landscapes and the landscape-edge line fix. Version bump
 in `__init__`, debian/changelog, metainfo (screenshots pinned to v1.5.3, not re-rendered: the
 shipped landscapes look the same).
+- The user tested beta ("beta works"; their snap now runs 1.5.3 rev 11). Rev 11 promoted to stable.
+  1.5.2 (rev 10) never went to stable: its changes reach stable users with 1.5.3.
