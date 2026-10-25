@@ -22,10 +22,10 @@ user32 = ctypes.WinDLL('user32', use_last_error=True)
 gdi32 = ctypes.WinDLL('gdi32')
 
 _GWL_STYLE, _GWL_EXSTYLE = -16, -20
-_WS_CHILD, _WS_POPUP = 0x40000000, 0x80000000
+_WS_CHILD, _WS_POPUP, _WS_VISIBLE = 0x40000000, 0x80000000, 0x10000000
 _WS_EX_TOOLWINDOW, _WS_EX_NOACTIVATE, _WS_EX_APPWINDOW = 0x80, 0x08000000, 0x40000
 _WS_EX_LAYERED, _LWA_ALPHA = 0x80000, 0x2
-_SWP_NOSIZE, _SWP_NOZORDER = 0x1, 0x4
+_SWP_NOSIZE, _SWP_NOMOVE, _SWP_NOZORDER = 0x1, 0x2, 0x4
 _SWP_NOACTIVATE, _SWP_SHOWWINDOW, _SWP_FRAMECHANGED = 0x10, 0x40, 0x20
 _HWND_TOP, _HWND_BOTTOM = 0, 1
 _RGN_OR = 2
@@ -105,11 +105,13 @@ def _icon_layer():
     user32.SendMessageTimeoutW(progman, 0x052C, 0xD, 0x1, _SMTO_NORMAL, 1000, None)
     defview = user32.FindWindowExW(progman, None, 'SHELLDLL_DefView', None)
     if defview:
-        # Windows 11 24H2 and later: the icons and the wallpaper's WorkerW are both Progman's
-        # children, the WorkerW below the icons. A child of Progman itself isn't composited
-        # (Progman has no redirection surface); inside the WorkerW the sky covers the wallpaper
+        # Windows 11 24H2 and later ("raised desktop"): the icons and the wallpaper's WorkerW are
+        # both Progman's children. The sky goes between them, the WorkerW at the bottom
         worker = user32.FindWindowExW(progman, None, 'WorkerW', None)
-        return (worker, None) if worker else (progman, defview)
+        if worker:
+            user32.SetWindowPos(worker, _HWND_BOTTOM, 0, 0, 0, 0,
+                                _SWP_NOSIZE | _SWP_NOMOVE | _SWP_NOACTIVATE)
+        return progman, defview
     found = []
 
     def _probe(hwnd, _lparam):
@@ -177,26 +179,79 @@ user32.CreateWindowExW.argtypes = [wintypes.DWORD, wintypes.LPCWSTR, wintypes.LP
                                    wintypes.HWND, wintypes.HMENU, wintypes.HINSTANCE, wintypes.LPVOID]
 user32.DestroyWindow.argtypes = [wintypes.HWND]
 user32.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
-_ULW_ALPHA, _AC_SRC_ALPHA = 0x2, 0x1
-gdi32.CreateCompatibleDC.restype = wintypes.HDC
-gdi32.CreateCompatibleDC.argtypes = [wintypes.HDC]
-gdi32.CreateDIBSection.restype = wintypes.HBITMAP
-gdi32.CreateDIBSection.argtypes = [wintypes.HDC, ctypes.c_void_p, wintypes.UINT,
-                                   ctypes.POINTER(ctypes.c_void_p), wintypes.HANDLE, wintypes.DWORD]
-gdi32.SelectObject.restype = wintypes.HGDIOBJ
-gdi32.SelectObject.argtypes = [wintypes.HDC, wintypes.HGDIOBJ]
-gdi32.DeleteDC.argtypes = [wintypes.HDC]
+class _GUID(ctypes.Structure):
+    _fields_ = [('Data1', wintypes.DWORD), ('Data2', wintypes.WORD), ('Data3', wintypes.WORD),
+                ('Data4', ctypes.c_ubyte * 8)]
 
 
-class _BLENDFUNCTION(ctypes.Structure):
-    _fields_ = [('BlendOp', ctypes.c_ubyte), ('BlendFlags', ctypes.c_ubyte),
-                ('SourceConstantAlpha', ctypes.c_ubyte), ('AlphaFormat', ctypes.c_ubyte)]
+class _DXGI_MODE_DESC(ctypes.Structure):
+    _fields_ = [('Width', wintypes.UINT), ('Height', wintypes.UINT),
+                ('RefreshNumerator', wintypes.UINT), ('RefreshDenominator', wintypes.UINT),
+                ('Format', wintypes.UINT), ('ScanlineOrdering', wintypes.UINT),
+                ('Scaling', wintypes.UINT)]
 
 
-user32.UpdateLayeredWindow.argtypes = [wintypes.HWND, wintypes.HDC, ctypes.POINTER(wintypes.POINT),
-                                       ctypes.POINTER(wintypes.SIZE), wintypes.HDC,
-                                       ctypes.POINTER(wintypes.POINT), wintypes.COLORREF,
-                                       ctypes.POINTER(_BLENDFUNCTION), wintypes.DWORD]
+class _DXGI_SWAP_CHAIN_DESC(ctypes.Structure):
+    _fields_ = [('BufferDesc', _DXGI_MODE_DESC), ('SampleCount', wintypes.UINT),
+                ('SampleQuality', wintypes.UINT), ('BufferUsage', wintypes.UINT),
+                ('BufferCount', wintypes.UINT), ('OutputWindow', wintypes.HWND),
+                ('Windowed', wintypes.BOOL), ('SwapEffect', wintypes.UINT), ('Flags', wintypes.UINT)]
+
+
+_IID_TEXTURE2D = _GUID(0x6f15aaf2, 0xd208, 0x4e89,
+                       (ctypes.c_ubyte * 8)(0x9a, 0xb4, 0x48, 0x95, 0x35, 0xd3, 0x4f, 0x9c))
+
+
+def _com(obj, index, *argtypes, restype=ctypes.HRESULT):
+    """Method `index` of a COM object's vtable, as a callable taking the remaining arguments."""
+    vtable = ctypes.cast(obj, ctypes.POINTER(ctypes.POINTER(ctypes.c_void_p)))[0]
+    fn = ctypes.WINFUNCTYPE(restype, ctypes.c_void_p, *argtypes)(vtable[index])
+    return lambda *args: fn(obj, *args)
+
+
+class _D3DPresenter:
+    """
+    A Direct3D 11 flip-model swap chain on a window: frames (BGRA, premultiplied: Cairo's ARGB32)
+    are copied into the back buffer and presented. The raised desktop composites this, where
+    pixels drawn with GDI never show. Hardware first, then WARP (software; no GPU needed).
+    """
+    def __init__(self, hwnd, w, h):
+        d3d11 = ctypes.WinDLL('d3d11')
+        desc = _DXGI_SWAP_CHAIN_DESC(
+            BufferDesc=_DXGI_MODE_DESC(Width=w, Height=h, Format=87),   # B8G8R8A8_UNORM
+            SampleCount=1, BufferUsage=0x20, BufferCount=2,            # render target output
+            OutputWindow=hwnd, Windowed=True, SwapEffect=4)            # FLIP_DISCARD
+        self._swap, self._dev, self._ctx = ctypes.c_void_p(), ctypes.c_void_p(), ctypes.c_void_p()
+        hr = 0
+        for driver in (1, 5):   # D3D_DRIVER_TYPE_HARDWARE, _WARP
+            hr = d3d11.D3D11CreateDeviceAndSwapChain(
+                None, driver, None, 0x20, None, 0, 7, ctypes.byref(desc),   # BGRA support
+                ctypes.byref(self._swap), ctypes.byref(self._dev), None, ctypes.byref(self._ctx))
+            if hr >= 0:
+                print(f"Caelum: Direct3D 11 swap chain ({'hardware' if driver == 1 else 'WARP'})",
+                      file=sys.stderr, flush=True)
+                break
+        else:
+            raise OSError(f'D3D11CreateDeviceAndSwapChain failed: {hr & 0xFFFFFFFF:#010x}')
+
+    def present(self, data, stride):
+        tex = ctypes.c_void_p()
+        _com(self._swap, 9, wintypes.UINT, ctypes.POINTER(_GUID),           # GetBuffer
+             ctypes.POINTER(ctypes.c_void_p))(0, ctypes.byref(_IID_TEXTURE2D), ctypes.byref(tex))
+        try:
+            _com(self._ctx, 48, ctypes.c_void_p, wintypes.UINT, ctypes.c_void_p,  # UpdateSubresource
+                 ctypes.c_char_p, wintypes.UINT, wintypes.UINT, restype=None)(
+                tex, 0, None, data, stride, 0)
+        finally:
+            _com(tex, 2, restype=wintypes.ULONG)()                           # Release
+        _com(self._swap, 8, wintypes.UINT, wintypes.UINT)(0, 0)              # Present, no wait
+
+    def release(self):
+        for obj in (self._ctx, self._swap, self._dev):
+            if obj:
+                _com(obj, 2, restype=wintypes.ULONG)()
+
+
 _kernel32 = ctypes.WinDLL('kernel32')
 _kernel32.GetModuleHandleW.restype = wintypes.HMODULE
 
@@ -210,25 +265,16 @@ class _WNDCLASSEXW(ctypes.Structure):
                 ('hIconSm', wintypes.HICON)]
 
 
-class _BITMAPINFOHEADER(ctypes.Structure):
-    _fields_ = [('biSize', wintypes.DWORD), ('biWidth', wintypes.LONG), ('biHeight', wintypes.LONG),
-                ('biPlanes', wintypes.WORD), ('biBitCount', wintypes.WORD),
-                ('biCompression', wintypes.DWORD), ('biSizeImage', wintypes.DWORD),
-                ('biXPelsPerMeter', wintypes.LONG), ('biYPelsPerMeter', wintypes.LONG),
-                ('biClrUsed', wintypes.DWORD), ('biClrImportant', wintypes.DWORD)]
-
-
 class DesktopCanvas:
     """
-    A plain Win32 window behind the desktop icons that shows the sky's frames, rendered off screen
-    with Cairo. Frames go in with UpdateLayeredWindow: 24H2's desktop is composited and ignored
-    pixels drawn into the window (GetDC/WM_PAINT, then SetDIBitsToDevice). Cairo's ARGB32 is the premultiplied 32-bit
-    top-down DIB that UpdateLayeredWindow takes.
+    The sky behind the desktop icons, in plain Win32 windows (GTK can't be reparented). A layered
+    host goes into the icon layer, created top-level and then made a child, as live-wallpaper
+    apps do on the raised desktop; a child window inside it shows the frames, rendered off screen
+    with Cairo, through a Direct3D swap chain (the raised desktop ignores GDI drawing there).
     """
     _CLASS = 'CaelumDesktopSky'
 
     def __init__(self):
-        self._blit_error = False
         self._proc = _WNDPROC(self._wndproc)    # keep a reference: Windows calls it
         hinst = _kernel32.GetModuleHandleW(None)
         wc = _WNDCLASSEXW(cbSize=ctypes.sizeof(_WNDCLASSEXW), lpfnWndProc=self._proc,
@@ -241,16 +287,14 @@ class DesktopCanvas:
                                            x, y, w, h, None, None, hinst, None)
         if not self.hwnd:
             raise ctypes.WinError(ctypes.get_last_error())
-        # One DIB section the frames are copied into, selected in a memory DC
-        bmi = _BITMAPINFOHEADER(biSize=ctypes.sizeof(_BITMAPINFOHEADER), biWidth=w, biHeight=-h,
-                                biPlanes=1, biBitCount=32)   # top-down, BI_RGB
-        self._bits = ctypes.c_void_p()
-        self._mem_dc = gdi32.CreateCompatibleDC(None)
-        self._bitmap = gdi32.CreateDIBSection(self._mem_dc, ctypes.byref(bmi), 0,
-                                              ctypes.byref(self._bits), None, 0)
-        if not self._bitmap:
+        user32.SetLayeredWindowAttributes(self.hwnd, 0, 255, _LWA_ALPHA)
+        self._view = user32.CreateWindowExW(0, self._CLASS, 'Caelum sky view',
+                                            _WS_CHILD | _WS_VISIBLE, 0, 0, w, h,
+                                            self.hwnd, None, hinst, None)
+        if not self._view:
             raise ctypes.WinError(ctypes.get_last_error())
-        gdi32.SelectObject(self._mem_dc, self._bitmap)
+        self._d3d = _D3DPresenter(self._view, w, h)
+        self._error = False
 
     def place(self):
         """Behind the icons; False when there is no icon layer to go behind."""
@@ -259,12 +303,12 @@ class DesktopCanvas:
             return False
         parent, below = layer
         x, y, w, h = _primary_rect()
+        user32.SetParent(self.hwnd, parent)
         style = user32.GetWindowLongPtrW(self.hwnd, _GWL_STYLE)
         user32.SetWindowLongPtrW(self.hwnd, _GWL_STYLE, (style | _WS_CHILD) & ~_WS_POPUP)
-        user32.SetParent(self.hwnd, parent)
         x -= user32.GetSystemMetrics(_SM_XVIRTUALSCREEN)
         y -= user32.GetSystemMetrics(_SM_YVIRTUALSCREEN)
-        # In a WorkerW: on top of its children; in Progman: just below the icons
+        # In Progman: just below the icons; in an older Windows' WorkerW: on top of its children
         user32.SetWindowPos(self.hwnd, below or _HWND_TOP, x, y, w, h,
                             _SWP_NOACTIVATE | _SWP_SHOWWINDOW | _SWP_FRAMECHANGED)
         _log(self.hwnd, 'behind the icons (in Progman, below the icons)' if below
@@ -288,30 +332,24 @@ class DesktopCanvas:
               file=sys.stderr, flush=True)
 
     def show(self, pixels, w, h, stride):
-        """Show a frame: Cairo ARGB32 pixels, h rows of `stride` bytes (= w * 4 at this size)."""
-        if (w, h) != self.size or stride != w * 4:
+        """Show a frame: Cairo ARGB32 pixels, h rows of `stride` bytes."""
+        if (w, h) != self.size:
             return
-        ctypes.memmove(self._bits, bytes(pixels), stride * h)
-        size = wintypes.SIZE(w, h)
-        blend = _BLENDFUNCTION(0, 0, 255, _AC_SRC_ALPHA)   # AC_SRC_OVER, per-pixel alpha
-        ok = user32.UpdateLayeredWindow(self.hwnd, None, None, ctypes.byref(size), self._mem_dc,
-                                        ctypes.byref(wintypes.POINT(0, 0)), 0,
-                                        ctypes.byref(blend), _ULW_ALPHA)
-        if not ok and not self._blit_error:
-            self._blit_error = True      # once: the log would fill up 10 times a second
-            print(f'Caelum: desktop canvas: UpdateLayeredWindow failed '
-                  f'(error {ctypes.get_last_error()})', file=sys.stderr, flush=True)
+        try:
+            self._d3d.present(bytes(pixels), stride)
+        except OSError as e:
+            if not self._error:
+                self._error = True    # once: the log would fill up 10 times a second
+                print(f'Caelum: desktop canvas: {e}', file=sys.stderr, flush=True)
 
     def destroy(self):
         user32.ShowWindow(self.hwnd, _SW_HIDE)
+        self._d3d.release()
         user32.DestroyWindow(self.hwnd)
-        gdi32.DeleteDC(self._mem_dc)
-        gdi32.DeleteObject(self._bitmap)
 
     def _wndproc(self, hwnd, msg, wparam, lparam):
-        # UpdateLayeredWindow keeps the picture: nothing to paint
         if msg == _WM_ERASEBKGND:
-            return 1
+            return 1      # Direct3D covers everything: no flash of the class brush
         return user32.DefWindowProcW(hwnd, msg, wparam, lparam)
 
 

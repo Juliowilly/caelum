@@ -1668,3 +1668,12 @@ auto-hide, scaled to GTK pixels).
   surface, so its direct children aren't composited. On 24H2 the canvas now goes *inside* the
   WorkerW that Progman holds below the icons (on top of the WorkerW's children). CI now compares a
   screenshot from before the start with one after: the sky must change ≥ 60 % of a point grid.
+- WorkerW run: still not visible (2 % of the desktop changed). Research: on the 24H2 "raised
+  desktop" (Progman has WS_EX_NOREDIRECTIONBITMAP), live-wallpaper apps (rexxpaper, Lively,
+  FeatherWall) put a layered host, created top-level then made Progman's child, between the icons
+  and the WorkerW (WorkerW to the bottom), and render with Direct3D/DirectComposition (mpv with
+  d3d11); GDI content is not composited there.
+- So the canvas is now that host plus a child view with a **Direct3D 11 flip-model swap chain**
+  (ctypes COM, no new dependency; hardware, else WARP). Each Cairo frame is copied to the back
+  buffer (UpdateSubresource; Cairo's premultiplied BGRA is B8G8R8A8_UNORM) and presented without
+  waiting for vsync. If the canvas can't be made, the sky stays over the icons.

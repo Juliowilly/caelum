@@ -321,11 +321,14 @@ class SkyTracker(Gtk.Window):
         want = self.cfg.get('click_through', True)
         self._placed_for = want
         behind = False
-        try:
-            if want:
+        if want:
+            try:
                 if self._canvas is None:
                     self._canvas = self._win32.DesktopCanvas()
                 behind = self._canvas.place()
+            except Exception as e:
+                print(f'Caelum: the sky stays over the icons: {e}', file=sys.stderr, flush=True)
+        try:
             if behind:
                 self.hide()
                 self._hit.show_all()
