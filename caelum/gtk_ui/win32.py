@@ -22,8 +22,10 @@ _GWL_STYLE, _GWL_EXSTYLE = -16, -20
 _WS_CHILD, _WS_POPUP = 0x40000000, 0x80000000
 _WS_EX_TOOLWINDOW, _WS_EX_NOACTIVATE, _WS_EX_APPWINDOW = 0x80, 0x08000000, 0x40000
 _WS_EX_LAYERED, _LWA_ALPHA = 0x80000, 0x2
-_SWP_NOSIZE, _SWP_NOACTIVATE, _SWP_SHOWWINDOW, _SWP_FRAMECHANGED = 0x1, 0x10, 0x40, 0x20
+_SWP_NOSIZE, _SWP_NOZORDER = 0x1, 0x4
+_SWP_NOACTIVATE, _SWP_SHOWWINDOW, _SWP_FRAMECHANGED = 0x10, 0x40, 0x20
 _HWND_BOTTOM = 1
+_GW_HWNDPREV = 3
 _SMTO_NORMAL = 0
 _SPI_GETDESKWALLPAPER, _SPI_SETDESKWALLPAPER = 0x73, 0x14
 _SPIF_UPDATEINIFILE, _SPIF_SENDCHANGE = 0x1, 0x2
@@ -50,6 +52,8 @@ user32.MonitorFromPoint.restype = wintypes.HMONITOR
 user32.MonitorFromPoint.argtypes = [wintypes.POINT, wintypes.DWORD]
 user32.SetLayeredWindowAttributes.argtypes = [wintypes.HWND, wintypes.COLORREF, wintypes.BYTE,
                                               wintypes.DWORD]
+user32.GetWindow.restype = wintypes.HWND
+user32.GetWindow.argtypes = [wintypes.HWND, wintypes.UINT]
 user32.SystemParametersInfoW.argtypes = [wintypes.UINT, wintypes.UINT, ctypes.c_void_p, wintypes.UINT]
 _ENUM_PROC = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
 user32.EnumWindows.argtypes = [_ENUM_PROC, wintypes.LPARAM]
@@ -119,6 +123,9 @@ def _primary_rect():
     return r.left, r.top, r.right - r.left, r.bottom - r.top
 
 
+_layered_by_us = set()   # sky windows made layered here (24H2), not by GTK
+
+
 def primary_size():
     """Primary monitor (width, height) in the pixels this process sees."""
     return _primary_rect()[2:]
@@ -135,7 +142,7 @@ def place_sky(hwnd, behind_icons):
     ex = user32.GetWindowLongPtrW(hwnd, _GWL_EXSTYLE)
     # GTK paints through a layered window (UpdateLayeredWindow) unless GDK_WIN32_LAYERED=0 (app.py)
     # turned that off; the bit is GTK's then, keep it
-    gtk_layered = bool(ex & _WS_EX_LAYERED)
+    gtk_layered = bool(ex & _WS_EX_LAYERED) and hwnd not in _layered_by_us
     # Never in the taskbar or Alt+Tab, and a click doesn't raise it over the user's windows
     ex = (ex | _WS_EX_TOOLWINDOW | _WS_EX_NOACTIVATE) & ~_WS_EX_APPWINDOW
     style = user32.GetWindowLongPtrW(hwnd, _GWL_STYLE)
@@ -146,8 +153,9 @@ def place_sky(hwnd, behind_icons):
         if below and not gtk_layered:
             # 24H2's Progman is composited: only a layered child gets drawn there (fully opaque)
             ex |= _WS_EX_LAYERED
+            _layered_by_us.add(hwnd)
         user32.SetWindowLongPtrW(hwnd, _GWL_EXSTYLE, ex)
-        if below and not gtk_layered:
+        if hwnd in _layered_by_us:
             user32.SetLayeredWindowAttributes(hwnd, 0, 255, _LWA_ALPHA)
         user32.SetWindowLongPtrW(hwnd, _GWL_STYLE, (style | _WS_CHILD) & ~_WS_POPUP)
         user32.SetParent(hwnd, parent)
@@ -156,10 +164,18 @@ def place_sky(hwnd, behind_icons):
         user32.SetWindowPos(hwnd, below or _HWND_BOTTOM, x, y, 0, 0, flags)
         _log(hwnd, 'behind the icons (24H2 Progman)' if below else 'behind the icons (WorkerW)')
         return True
+    if hwnd in _layered_by_us:
+        ex &= ~_WS_EX_LAYERED
+        _layered_by_us.discard(hwnd)
     user32.SetWindowLongPtrW(hwnd, _GWL_EXSTYLE, ex)
     user32.SetParent(hwnd, None)
     user32.SetWindowLongPtrW(hwnd, _GWL_STYLE, (style | _WS_POPUP) & ~_WS_CHILD)
-    user32.SetWindowPos(hwnd, _HWND_BOTTOM, x, y, 0, 0, flags)
+    # Just above the desktop (Progman, a full-screen window of its own), not under it
+    progman = user32.FindWindowW('Progman', None)
+    above = user32.GetWindow(progman, _GW_HWNDPREV) if progman else None
+    if above == hwnd:
+        flags |= _SWP_NOZORDER
+    user32.SetWindowPos(hwnd, above or _HWND_BOTTOM, x, y, 0, 0, flags)
     _log(hwnd, 'bottom-most window' + ('' if not behind_icons else ' (no icon layer found)'))
     return False
 

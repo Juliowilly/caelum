@@ -1591,3 +1591,8 @@ Releases; (3) built on GitHub Actions. This session: step 1, on the `windows` br
   (UpdateLayeredWindow), which 24H2's Progman doesn't draw. On Windows, app.py now sets
   `GDK_WIN32_LAYERED=0` before GTK starts, so the sky paints normally and the 24H2 path makes it
   layered with plain alpha 255. The probe found only the runner's terminal at the centre: removed.
+- Fifth run: **behind the icons works** on the 24H2 layout (night sky under the desktop icons).
+  Click-through off then showed nothing: without GTK's layered bit, HWND_BOTTOM put the sky under
+  Progman, a full-screen window itself. The bottom-most sky now goes just above Progman. The
+  layered bit added for 24H2 is tracked per window, and removed again when the switch brings the
+  sky in front of the icons.
