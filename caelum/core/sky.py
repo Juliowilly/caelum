@@ -1,6 +1,7 @@
 """Panorama projection, sky/cloud colour palettes and small math helpers."""
 
 import math
+import random
 
 _FACING = 180.0   # azimuth the panorama is centred on; updated each frame from config
 
@@ -72,9 +73,50 @@ def sky_color(el):
     if el < 50:    return _lerp(S['morning'],  S['noon'],     (el - 20) / 30)
     return S['noon']
 
+# ─── Cloud optics ────────────────────────────────────────────────────────────
+# Cloud cover is a fraction of sky area, not a dimmer: where there is no cloud the sun
+# is at full strength. Each layer blocks a different share of the light where it is.
+_LAYER_OPACITY = {'low': 1.0, 'mid': 0.7, 'high': 0.2}
+
+def cloud_layers(clouds):
+    """(low, mid, high) cover in %. A total with no layer split counts as mid-level."""
+    low, mid, high = clouds.get('low', 0), clouds.get('mid', 0), clouds.get('high', 0)
+    if clouds.get('total', 0) > 0 and low == 0 and mid == 0 and high == 0:
+        mid = clouds['total']
+    return low, mid, high
+
+def opaque_cover(clouds):
+    """Fraction 0–1 of sky light blocked, weighting each layer by its optical thickness."""
+    clear = 1.0
+    for name, cov in zip(('low', 'mid', 'high'), cloud_layers(clouds)):
+        clear *= 1.0 - _LAYER_OPACITY[name] * _clamp(cov / 100.0, 0.0, 1.0)
+    return 1.0 - clear
+
+def veil_transmission(clouds):
+    """
+    Uniform dimming of the sun/moon by layers dense enough to form a continuous sheet.
+    Broken cloud does not dim the sun everywhere; it hides it only where a cloud is drawn
+    in front of it (see body_occluders). Cirrus is a thin veil at any cover.
+    """
+    low, mid, high = cloud_layers(clouds)
+    t  = 1.0 - 0.15 * _clamp(high / 100.0, 0.0, 1.0)         # cirrostratus
+    t *= 1.0 - 0.55 * _clamp((mid - 60) / 40.0, 0.0, 1.0)    # altostratus sheet
+    t *= 1.0 - 0.85 * _clamp((low - 70) / 30.0, 0.0, 1.0)    # stratus / stratocumulus deck
+    return t
+
+def body_occluders(clouds, seed):
+    """
+    Layers ('low', 'mid') with a cloud in front of the sun/moon for this seed (time slot).
+    Each layer covers the body with a chance equal to its cover, so over many slots the
+    body is hidden as often as the sky is covered: 30% cover → hidden ~30% of the time.
+    """
+    rng = random.Random(seed)
+    low, mid, _high = cloud_layers(clouds)
+    return {name for name, cov in (('low', low), ('mid', mid)) if rng.random() * 100 < cov}
+
 def sky_color_adaptive(el, clouds, m_bright):
     r, g, b, a = sky_color(el)
-    cf = clouds['total'] / 100.0
+    cf = opaque_cover(clouds)
     r = r + (0.50 - r) * cf * 0.40
     g = g + (0.50 - g) * cf * 0.38
     b = b + (0.50 - b) * cf * 0.32

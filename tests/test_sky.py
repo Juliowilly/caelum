@@ -1,7 +1,9 @@
 import unittest
 
 from caelum.core.astronomy import phase_index
-from caelum.core.sky import set_facing, sky_to_screen
+from caelum.core.sky import (
+    body_occluders, cloud_layers, opaque_cover, set_facing, sky_to_screen, veil_transmission,
+)
 
 W, H = 1000, 500
 
@@ -29,6 +31,35 @@ class PhaseNameTest(unittest.TestCase):
         cases = {0.0: 0, 0.06: 0, 0.07: 1, 0.25: 2, 0.36: 3, 0.5: 4, 0.75: 6, 0.95: 0}
         for phase, idx in cases.items():
             self.assertEqual(phase_index(phase), idx, msg=f'phase {phase}')
+
+
+def _clouds(total, low=0, mid=0, high=0):
+    return {'total': total, 'low': low, 'mid': mid, 'high': high}
+
+
+class CloudOpticsTest(unittest.TestCase):
+    def test_total_without_layers_counts_as_mid(self):
+        self.assertEqual(cloud_layers(_clouds(40)), (0, 40, 0))
+
+    def test_broken_cloud_does_not_veil_the_sun(self):
+        # Scattered/broken low cloud hides the sun only where a cloud is drawn
+        self.assertEqual(veil_transmission(_clouds(60, low=60)), 1.0)
+        self.assertEqual(veil_transmission(_clouds(50, mid=50)), 1.0)
+
+    def test_cirrus_is_a_thin_veil(self):
+        self.assertGreater(veil_transmission(_clouds(100, high=100)), 0.8)
+        self.assertLess(opaque_cover(_clouds(100, high=100)), 0.25)
+
+    def test_overcast_low_deck_hides_the_sun(self):
+        self.assertLess(veil_transmission(_clouds(100, low=100)), 0.2)
+        self.assertEqual(opaque_cover(_clouds(100, low=100)), 1.0)
+
+    def test_body_covered_as_often_as_the_sky(self):
+        for cov in (0, 30, 60, 100):
+            hits = sum('low' in body_occluders(_clouds(cov, low=cov), seed)
+                       for seed in range(2000))
+            self.assertAlmostEqual(hits / 2000, cov / 100, delta=0.04, msg=f'{cov}%')
+        self.assertEqual(body_occluders(_clouds(80, high=80), 1), set())
 
 
 if __name__ == '__main__':

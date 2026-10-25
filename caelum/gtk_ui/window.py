@@ -26,8 +26,9 @@ from ..core.catalog import _CONSTELLATIONS
 from ..core.config import DEFAULT_CONFIG, load_config, save_config
 from ..core.i18n import _PHASE_NAMES, _day_name, _fmt_date, _t
 from ..core.sky import (
-    _clamp, _cloud_palette, _seg_dist, get_facing, moon_brightness, set_facing,
-    sky_color_adaptive, sky_to_screen,
+    _clamp, _cloud_palette, _seg_dist, body_occluders, cloud_layers, get_facing,
+    moon_brightness, opaque_cover, set_facing, sky_color_adaptive, sky_to_screen,
+    veil_transmission,
 )
 from ..core.weather import (
     _NO_CLOUDS, _WX_ACCENT, _WX_LABEL, fetch_met_norway, fetch_open_meteo, merge_weather,
@@ -484,14 +485,15 @@ class SkyTracker(Gtk.Window):
         else:
             sun_el, sun_az, m_el, m_az, phase, age, m_bright = self._astro_cache
 
-        # ── Cloud occlusion visibility factors ───────────────────────────────
-        cld_total = self._clouds.get('total', 0)
+        # ── Cloud veil: uniform dimming only from layers that form a continuous sheet.
+        # Broken cloud hides the bodies by being drawn in front of them (_draw_clouds).
+        veil = veil_transmission(self._clouds)
         # Sun: always retains a faint diffuse glow through overcast
-        sun_vis  = max(0.10, 1.0 - _clamp((cld_total - 10) / 75.0, 0.0, 1.0))
+        sun_vis  = max(0.10, veil)
         # Moon: dims a bit faster than the sun
-        moon_vis = max(0.04, 1.0 - _clamp((cld_total - 15) / 70.0, 0.0, 1.0))
-        # Stars and planets vanish completely behind thick cloud
-        sky_vis  = 1.0 - _clamp((cld_total - 20) / 65.0, 0.0, 1.0)
+        moon_vis = max(0.04, veil ** 1.2)
+        # Stars and planets are faint: a veil the sun shines through hides them
+        sky_vis  = veil ** 2
 
         # ── Gear button is always drawn first (visible even when app is off)
         gx, gy = W - 28, H - 28
@@ -507,9 +509,8 @@ class SkyTracker(Gtk.Window):
             self._draw_gear_btn(cr, gx, gy, 16, off=True)
             return
 
-        # ── sky gradient + clouds (clouds need body positions for glow)
-        self._draw_sky(cr, W, H, sun_el, sun_az, m_el, m_az, self._clouds, m_bright,
-                       lat, lon, utc)
+        # ── sky gradient + stars (clouds come after the bodies, so they can pass in front)
+        self._draw_sky(cr, W, H, sun_el, sun_az, self._clouds, m_bright, sky_vis, lat, lon, utc)
 
         # ── sun (show once above ~-2° so horizon glow is visible)
         if sun_el > -2:
@@ -570,6 +571,9 @@ class SkyTracker(Gtk.Window):
                 cr.pop_group_to_source()
                 cr.paint_with_alpha(sky_vis)
 
+        # ── clouds, rain and silhouette in front of the sun, moon and planets
+        self._draw_weather(cr, W, H, sun_el, sun_az, m_el, m_az, self._clouds, scale)
+
         # Constellation names only meaningful at night
         if sun_el >= -5:
             self._hover_const = None
@@ -604,7 +608,7 @@ class SkyTracker(Gtk.Window):
 
     # ── Sky background ───────────────────────────────────────────────────────
 
-    def _draw_sky(self, cr, W, H, sun_el, sun_az, m_el, m_az, clouds, m_bright,
+    def _draw_sky(self, cr, W, H, sun_el, sun_az, clouds, m_bright, star_vis=1.0,
                   lat=6.14, lon=1.21, utc=None):
         r, g, b, a = sky_color_adaptive(sun_el, clouds, m_bright)
         grad = cairo.LinearGradient(0, 0, 0, H)
@@ -621,18 +625,25 @@ class SkyTracker(Gtk.Window):
         self._draw_horizon_effects(cr, W, H, sun_el, sun_az)
 
         if sun_el < -5:
-            star_vis = 1.0 - _clamp((clouds['total'] - 20) / 65.0, 0.0, 1.0)
             self._draw_stars(cr, W, H,
                              _clamp((-5 - sun_el) / 13, 0, 1) * star_vis,
                              lat, lon, utc, m_bright)
             self._maybe_spawn_meteor(W, H)
             self._draw_meteors(cr, W, H)
 
+    def _draw_weather(self, cr, W, H, sun_el, sun_az, m_el, m_az, clouds, scale):
         if clouds['total'] > 0:
-            body_pos = sky_to_screen(max(sun_el, 0.5), sun_az, W, H) if sun_el > -0.83 else None
-            if body_pos is None and m_el > 0:
-                body_pos = sky_to_screen(m_el, m_az, W, H)
-            self._draw_clouds(cr, W, H, clouds, sun_el, body_pos)
+            # Disc to keep clear (or cover): the sun's bright core, else the moon
+            body = None
+            if sun_el > -0.83:
+                pos = sky_to_screen(max(sun_el, 0.5), sun_az, W, H)
+                if pos:
+                    body = (pos[0], pos[1], 40 * scale)
+            if body is None and m_el > 0:
+                pos = sky_to_screen(m_el, m_az, W, H)
+                if pos:
+                    body = (pos[0], pos[1], 36 * scale)
+            self._draw_clouds(cr, W, H, clouds, sun_el, body)
 
         precip = clouds.get('precip', 0.0)
         if precip > 0:
@@ -1062,34 +1073,38 @@ class SkyTracker(Gtk.Window):
         cr.move_to(px + 10, py + ph - 7)
         cr.show_text(name)
 
-    def _draw_clouds(self, cr, W, H, clouds, sun_el, body_screen_pos=None):
+    def _draw_clouds(self, cr, W, H, clouds, sun_el, body=None):
         top_col, dark_col, cir_col = _cloud_palette(sun_el)
         today = datetime.date.today()
         hour  = datetime.datetime.now().hour
         rng_d = random.Random(today.toordinal())
-        rng_h = random.Random(today.toordinal() * 24 + hour)
+        slot  = today.toordinal() * 24 + hour
+        rng_h = random.Random(slot)
 
-        # If total > 0 but no layer data, put it all in mid level
-        high_cov = clouds['high']
-        mid_cov  = clouds['mid']
-        low_cov  = clouds['low']
-        total    = clouds['total']
-        wmo      = clouds.get('wmo', 0)
-        if total > 0 and high_cov == 0 and mid_cov == 0 and low_cov == 0:
-            mid_cov = total
+        low_cov, mid_cov, high_cov = cloud_layers(clouds)
+        wmo = clouds.get('wmo', 0)
 
-        # Overcast sheet: uniform gray ceiling for heavily overcast skies
-        if total > 65:
-            _draw_overcast_sheet(cr, W, H, total, top_col, dark_col)
+        # Overcast sheet: uniform gray ceiling only when the thick layers close up
+        opaque = opaque_cover(clouds) * 100
+        if opaque > 65:
+            _draw_overcast_sheet(cr, W, H, opaque, top_col, dark_col)
+
+        # Does a cloud sit in front of the sun/moon this hour? Chance = that layer's cover.
+        # Otherwise the disc is kept clear: broken cloud doesn't dim the whole sky.
+        covered = body_occluders(clouds, slot) if body else set()
+        avoid   = body
+        pos     = body[:2] if body else None
 
         # Back-to-front: cirrus → altocumulus → cumulus
         draw_cirrus(     cr, W, H, high_cov, cir_col,                    rng_d)
-        draw_altocumulus(cr, W, H, mid_cov,  top_col,                    rng_h)
-        draw_cumulus(    cr, W, H, low_cov,  top_col, dark_col, rng_h, wmo=wmo)
+        draw_altocumulus(cr, W, H, mid_cov,  top_col,                    rng_h,
+                         avoid=avoid, cover=pos if 'mid' in covered else None)
+        draw_cumulus(    cr, W, H, low_cov,  top_col, dark_col, rng_h, wmo=wmo,
+                         avoid=avoid, cover=pos if 'low' in covered else None)
 
         # Celestial body glow: illuminates clouds around sun/moon position
-        if body_screen_pos and clouds['total'] > 0:
-            self._draw_body_glow_on_clouds(cr, W, H, body_screen_pos, sun_el)
+        if pos:
+            self._draw_body_glow_on_clouds(cr, W, H, pos, sun_el)
 
     def _draw_body_glow_on_clouds(self, cr, W, H, pos, sun_el):
         """

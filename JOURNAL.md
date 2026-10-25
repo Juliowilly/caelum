@@ -708,3 +708,42 @@ caelum/gtk_ui/    window.py  settings.py  clouds.py  autostart.py  app.py
   `make flatpak-bundle` added; README install table points at the bundle instead of Flathub.
 - **PPA 1.1.1 built**: noble 2m46s, resolute 3m04s, both "Successfully built". All channels are now on
   1.1.1: PPA, Snap Store stable (rev 2), GitHub release (.deb, .snap, .flatpak).
+
+---
+
+## Session 13 — Realistic cloud occlusion of the sun and moon (before the APK)
+
+**Problem (user):** the sun and moon very often looked hidden behind clouds while the real sky was
+open with a few scattered clouds.
+
+**Cause:** cloud cover was used as a dimmer. The whole sun was faded by the *total* cover
+(`1 - (total-10)/75`: 40% → 60% opacity, 50% → 47%), the moon slightly faster, and the sun was drawn
+on top of the clouds anyway, so it looked veiled rather than behind a cloud. Cirrus counted like
+thick low cloud: 80% cirrus alone left the sun at ~33% and greyed the sky with the overcast sheet.
+
+### Fix — cover is a fraction of sky area; each layer has its own thickness
+- New in `caelum/core/sky.py` (no GTK, unit-tested):
+  - `cloud_layers()`: (low, mid, high); a total with no layer split counts as mid (moved from window).
+  - `opaque_cover()`: light blocked with per-layer opacity low 1.0 / mid 0.7 / high 0.2.
+    Used for the sky's grey tint (`sky_color_adaptive`) and the overcast sheet (was `total`).
+  - `veil_transmission()`: uniform dimming only from layers that form a continuous sheet:
+    cirrus ≤ 15%, altostratus above 60% mid, stratus deck above 70% low. Broken cloud: none.
+  - `body_occluders(clouds, seed)`: per hourly slot, low/mid each put a cloud in front of the
+    sun/moon with chance = that layer's cover (30% cover → hidden ~30% of the hours).
+- `gtk_ui/clouds.py`: `draw_cumulus` / `draw_altocumulus` take `avoid=(x, y, r)` (re-sample any
+  cloud that would reach the body's core) and `cover=(x, y)` (a dense cumulus, or a patch of
+  altocumulus clumps, drawn across the body). Single-cloud helpers `_cumulus_cloud`,
+  `_altocumulus_clump` split out of the loops.
+- `gtk_ui/window.py`: sun/moon/planet visibility come from `veil_transmission` (sun ≥ 0.10,
+  moon `veil^1.2`, stars and planets `veil^2`). Clouds, rain and silhouette moved out of `_draw_sky`
+  into `_draw_weather`, drawn **after** the sun, moon and planets so clouds really pass in front.
+  The silhouette now also covers a sun/moon sitting on the horizon.
+
+### Verified
+- Off-screen renders (scratch harness, fixed UTC, facing the body) before/after: 60% low cloud,
+  80% cirrus only, mid 40 + high 50, 95% overcast, and night with the moon. Sun fully bright when
+  clear, behind a lit cloud when covered; cirrus-only now a bright sun through thin streaks;
+  overcast unchanged.
+- 5 new tests (`CloudOpticsTest`), 13 pass; pyflakes clean.
+- Not changed: overcast still looks like big puffs on a grey sheet rather than a uniform deck, and
+  the cloud pattern is reshuffled hourly (no drift yet). Both are candidates for the next step.
