@@ -268,9 +268,9 @@ class SkyTracker(Gtk.Window):
         self.connect('button-press-event', self._on_click)
 
         self._win32 = None
-        self.show_all()
         if sys.platform == 'win32':
             self._setup_windows_desktop()
+        self.show_all()
         GLib.idle_add(self._force_fullscreen)
         GLib.timeout_add(500, self._force_fullscreen)
 
@@ -296,6 +296,8 @@ class SkyTracker(Gtk.Window):
         self._placed_for   = None    # click_through value the window was placed for
         self._behind_icons = False
         self._tray         = self._make_tray()
+        # GTK paints at the size it asked for: ask for the whole screen before the first show
+        self.set_default_size(*win32.primary_size())
         atexit.register(self._leave_desktop)
 
     def _place_on_desktop(self):
@@ -309,6 +311,8 @@ class SkyTracker(Gtk.Window):
         if self._behind_icons and not behind:
             self._win32.restore_desktop()
         self._behind_icons = behind
+        alloc = self.da.get_allocation()
+        print(f'Caelum: GTK draws {alloc.width}x{alloc.height}', file=sys.stderr, flush=True)
 
     def _leave_desktop(self):
         """On exit: take the sky off the icon layer so the user's wallpaper shows again."""

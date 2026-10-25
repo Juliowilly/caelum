@@ -21,7 +21,8 @@ user32 = ctypes.WinDLL('user32', use_last_error=True)
 _GWL_STYLE, _GWL_EXSTYLE = -16, -20
 _WS_CHILD, _WS_POPUP = 0x40000000, 0x80000000
 _WS_EX_TOOLWINDOW, _WS_EX_NOACTIVATE, _WS_EX_APPWINDOW = 0x80, 0x08000000, 0x40000
-_SWP_NOACTIVATE, _SWP_SHOWWINDOW, _SWP_FRAMECHANGED = 0x10, 0x40, 0x20
+_WS_EX_LAYERED, _LWA_ALPHA = 0x80000, 0x2
+_SWP_NOSIZE, _SWP_NOACTIVATE, _SWP_SHOWWINDOW, _SWP_FRAMECHANGED = 0x1, 0x10, 0x40, 0x20
 _HWND_BOTTOM = 1
 _SMTO_NORMAL = 0
 _SPI_GETDESKWALLPAPER, _SPI_SETDESKWALLPAPER = 0x73, 0x14
@@ -47,6 +48,8 @@ user32.SetWindowPos.argtypes = [wintypes.HWND, wintypes.HWND, ctypes.c_int, ctyp
                                 ctypes.c_int, ctypes.c_int, wintypes.UINT]
 user32.MonitorFromPoint.restype = wintypes.HMONITOR
 user32.MonitorFromPoint.argtypes = [wintypes.POINT, wintypes.DWORD]
+user32.SetLayeredWindowAttributes.argtypes = [wintypes.HWND, wintypes.COLORREF, wintypes.BYTE,
+                                              wintypes.DWORD]
 user32.SystemParametersInfoW.argtypes = [wintypes.UINT, wintypes.UINT, ctypes.c_void_p, wintypes.UINT]
 _ENUM_PROC = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
 user32.EnumWindows.argtypes = [_ENUM_PROC, wintypes.LPARAM]
@@ -116,32 +119,43 @@ def _primary_rect():
     return r.left, r.top, r.right - r.left, r.bottom - r.top
 
 
+def primary_size():
+    """Primary monitor (width, height) in the pixels this process sees."""
+    return _primary_rect()[2:]
+
+
 def place_sky(hwnd, behind_icons):
     """
     Put the sky window behind the desktop icons, or (behind_icons False, or no icon layer found)
     at the bottom of the normal windows. Returns True when it went behind the icons.
+    Only the position changes: GTK sizes the window itself, and paints at the size it asked for.
     """
-    x, y, w, h = _primary_rect()
+    x, y, _w, _h = _primary_rect()
+    flags = _SWP_NOSIZE | _SWP_NOACTIVATE | _SWP_SHOWWINDOW | _SWP_FRAMECHANGED
     ex = user32.GetWindowLongPtrW(hwnd, _GWL_EXSTYLE)
     # Never in the taskbar or Alt+Tab, and a click doesn't raise it over the user's windows
-    ex = (ex | _WS_EX_TOOLWINDOW | _WS_EX_NOACTIVATE) & ~_WS_EX_APPWINDOW
-    user32.SetWindowLongPtrW(hwnd, _GWL_EXSTYLE, ex)
+    ex = (ex | _WS_EX_TOOLWINDOW | _WS_EX_NOACTIVATE) & ~(_WS_EX_APPWINDOW | _WS_EX_LAYERED)
     style = user32.GetWindowLongPtrW(hwnd, _GWL_STYLE)
     layer = _icon_layer() if behind_icons else None
     if layer:
         parent, below = layer
+        if below:
+            # 24H2's Progman is composited: only a layered child gets drawn there (fully opaque)
+            ex |= _WS_EX_LAYERED
+        user32.SetWindowLongPtrW(hwnd, _GWL_EXSTYLE, ex)
+        if below:
+            user32.SetLayeredWindowAttributes(hwnd, 0, 255, _LWA_ALPHA)
         user32.SetWindowLongPtrW(hwnd, _GWL_STYLE, (style | _WS_CHILD) & ~_WS_POPUP)
         user32.SetParent(hwnd, parent)
         x -= user32.GetSystemMetrics(_SM_XVIRTUALSCREEN)
         y -= user32.GetSystemMetrics(_SM_YVIRTUALSCREEN)
-        user32.SetWindowPos(hwnd, below or _HWND_BOTTOM, x, y, w, h,
-                            _SWP_NOACTIVATE | _SWP_SHOWWINDOW | _SWP_FRAMECHANGED)
+        user32.SetWindowPos(hwnd, below or _HWND_BOTTOM, x, y, 0, 0, flags)
         _log(hwnd, 'behind the icons (24H2 Progman)' if below else 'behind the icons (WorkerW)')
         return True
+    user32.SetWindowLongPtrW(hwnd, _GWL_EXSTYLE, ex)
     user32.SetParent(hwnd, None)
     user32.SetWindowLongPtrW(hwnd, _GWL_STYLE, (style | _WS_POPUP) & ~_WS_CHILD)
-    user32.SetWindowPos(hwnd, _HWND_BOTTOM, x, y, w, h,
-                        _SWP_NOACTIVATE | _SWP_SHOWWINDOW | _SWP_FRAMECHANGED)
+    user32.SetWindowPos(hwnd, _HWND_BOTTOM, x, y, 0, 0, flags)
     _log(hwnd, 'bottom-most window' + ('' if not behind_icons else ' (no icon layer found)'))
     return False
 

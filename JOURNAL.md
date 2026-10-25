@@ -1576,3 +1576,9 @@ Releases; (3) built on GitHub Actions. This session: step 1, on the `windows` br
   windows, which don't paint as a child of the icon layer. The sky window is now opaque on
   Windows (the sky is opaque by default anyway), the placement is logged to caelum.log, and the
   CI takes one screenshot behind the icons and one with click-through off.
+- Second run: the placement log said both modes worked (24H2 Progman path; bottom-most), but the
+  click-through-off screenshot showed the sky in a 200×200 corner only: the Win32 resize never
+  reached GTK, which kept painting at its default size. Behind the icons nothing showed at all.
+  Now GTK gets the screen size (set_default_size) before the first show and the Win32 call only
+  moves the window. On 24H2 the sky child is layered (opaque), since 24H2's Progman is composited
+  and draws only layered children. The log also gives GTK's own drawing size.
