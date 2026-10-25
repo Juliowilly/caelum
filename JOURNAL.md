@@ -1599,3 +1599,10 @@ Releases; (3) built on GitHub Actions. This session: step 1, on the `windows` br
 - Sixth run: behind the icons still fine; click-through off still showed nothing, even just above
   Progman. The only run where it showed (the fourth) had a layered window, so the sky is now
   layered with plain alpha 255 in both modes.
+- Seventh run: **both modes show the sky** on Windows Server 2025 (24H2 base): behind the icons
+  (icons drawn over the sky) and click-through off (sky over the icons). Test zip:
+  `caelum-1.5.5-windows-x64.zip`, 47 MB, from the run's artifacts.
+- Still untested (no interactive Windows desktop in CI): the tray menu, live switching between the
+  modes, the wallpaper restored on quit, autostart, wallpaper export, older Windows (10, 11
+  before 24H2: the WorkerW path), several monitors, display scaling, SmartScreen on the unsigned
+  exe. These need the user's test on a real Windows PC.
