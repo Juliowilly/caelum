@@ -171,8 +171,9 @@ def fetch_met_norway(lat, lon):
 
 def merge_weather(om, met, obs=None):
     """
-    Merge Open-Meteo + MET Norway, taking the best of each source. `obs` is what the nearest
-    airport reports now (metar.nearest); when there is one, it decides whether it is raining.
+    Merge Open-Meteo + MET Norway, taking the best of each source. `obs` is the best available
+    observation of precipitation now (rain_now.observe: radar or an airport); when there is
+    one, it decides whether it is raining, otherwise the forecasts do.
     """
     if om is None and met is None:
         return None
@@ -198,7 +199,7 @@ def merge_weather(om, met, obs=None):
         else:
             result['total'] = met_total
             result['low']   = 0; result['mid'] = met_total; result['high'] = 0
-        # Without an airport nearby, rain comes from MET Norway's forecast for the coming hour
+        # Without an observation, rain comes from MET Norway's forecast for the coming hour
         result['precip'] = met['precip']
         result['snow']   = met['snow']
         if met['wmo'] > 0:
@@ -209,22 +210,31 @@ def merge_weather(om, met, obs=None):
         result['daily_forecast']  = met.get('daily_forecast', [])
         # Combined timestamp for smart-skip: update when either source changes
         result['ts'] = (om.get('ts', '') if om else '') + '|' + met.get('ts', '')
+    # Where "is it raining now" came from: met_radar | rainviewer | airport | met_forecast | om_forecast
+    result['rain_source'] = 'met_forecast' if met is not None else 'om_forecast'
+    result['rain_station'] = None
     if obs is not None:
-        # Observed beats forecast: both models missed (or invented) rain that the airport saw
+        # Observed beats forecast: the models often miss (or invent) a shower
         result['precip'] = obs['precip']
         result['snow']   = obs['snow']
         result['wmo']    = _observed_wmo(obs, result['wmo'])
-        result['ts']    += f"|{obs['station']}:{obs['time']:.0f}"
+        result['rain_source'] = obs['source']
+        if obs['source'] == 'airport':
+            result['rain_station'] = (obs['station'], obs['km'])
+        result['ts']    += f"|{obs['source']}:{obs['precip']}"
     if result['precip'] > 0 and result['total'] == 0:
         result['total'] = 60; result['low'] = 60
     return result
 
 
 def _observed_wmo(obs, model_wmo):
-    """WMO code for what the airport reports; dry, the model's code minus any rain or snow."""
+    """
+    WMO code for what is observed; dry, the model's code minus any rain or snow. Radar can't
+    see lightning (thunder None): then a rain shower keeps the model's thunderstorm code.
+    """
     p = obs['precip']
-    if obs['thunder']:
-        return 99 if p >= 8 else 95
+    if obs['thunder'] or (obs['thunder'] is None and p > 0 and model_wmo >= 95):
+        return 99 if p >= 8 else (model_wmo if model_wmo >= 95 else 95)
     if p <= 0:
         return model_wmo if model_wmo < 51 else 3
     if obs['snow']:

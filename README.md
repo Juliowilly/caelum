@@ -150,15 +150,16 @@ Settings are saved to `~/.config/caelum/config.json` (an older `config.json` nex
 | Data | Source |
 |---|---|
 | Weather (clouds, temp, wind, forecast) | [Open-Meteo](https://open-meteo.com) + [MET Norway](https://api.met.no) |
-| Is it raining now? | The nearest airport's observations (METAR, within 30 km) via [aviationweather.gov](https://aviationweather.gov/data/api/); without one, MET Norway's forecast for the coming hour |
+| Is it raining now? | The most accurate free source covering your location, in this order: weather radar ([MET Norway Nowcast](https://api.met.no/weatherapi/nowcast/2.0/documentation) in the Nordic countries, [RainViewer](https://www.rainviewer.com/api.html) elsewhere), else the nearest airport's observations (METAR within 30 km, via [aviationweather.gov](https://aviationweather.gov/data/api/)), else the forecast (MET Norway, then Open-Meteo). Settings → Location → Weather Data shows which one is in use |
 | Astronomy | Meeus *Astronomical Algorithms* |
 | City name | [Nominatim](https://nominatim.openstreetmap.org) (OpenStreetMap) |
 | Settings → Detect location | [ipwho.is](https://ipwho.is), falling back to [ipapi.co](https://ipapi.co) (only when you click it) |
 
 All sources are free and require no API key or account.
 
-**Privacy**: all requests use HTTPS. The weather, airport-report and city-name services receive your coordinates
-rounded to 2 decimals (about 1 km), never more precise. Nothing else about you is sent, and Caelum
+**Privacy**: all requests use HTTPS. The weather, radar, airport-report and city-name services receive your coordinates
+rounded to 2 decimals (about 1 km), never more precise; RainViewer only learns which ~300 km map
+tile you are in. Nothing else about you is sent, and Caelum
 collects no statistics.
 
 ## License

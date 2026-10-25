@@ -297,6 +297,12 @@ class SettingsDialog(Gtk.Window):
         btn.connect('clicked', self._save)
         page.pack_start(btn, False, False, 0)
 
+        lb = _group(page, _t('Weather Data'))
+        _row(lb, _t('Rain now'), Gtk.Label(label=self._rain_source_text(), xalign=1, wrap=True,
+                                          max_width_chars=28),
+             _t('Caelum uses the most accurate free source for your location: weather radar, '
+                'else the nearest airport, else the forecast'))
+
         lb = _group(page, _t('Facing & Compass'))
         hw_cmp = getattr(self.par, '_has_compass', False)
         if not hw_cmp:
@@ -401,6 +407,16 @@ class SettingsDialog(Gtk.Window):
         save_config(self.cfg)
         self.par.da.queue_draw()
 
+    def _rain_source_text(self):
+        clouds = getattr(self.par, '_clouds', {}) or {}
+        src = clouds.get('rain_source')
+        if src == 'airport' and clouds.get('rain_station'):
+            station, km = clouds['rain_station']
+            return _t('Airport {station}, {km} km away').format(station=station, km=round(km))
+        return {'met_radar': _t('Radar (MET Norway)'), 'rainviewer': _t('Radar (RainViewer)'),
+                'met_forecast': _t('Forecast (MET Norway)'),
+                'om_forecast': _t('Forecast (Open-Meteo)')}.get(src, _t('Not known yet'))
+
     def _detect_location(self, _btn):
         self._det_status.set_text('Detecting...')
         def _work():
@@ -437,7 +453,7 @@ class SettingsDialog(Gtk.Window):
             self.par._selected_day_slots = []
             self.par._last_om  = None
             self.par._last_met = None
-            self.par._last_metar = None
+            self.par._last_obs = None
             self.par._fetch_weather_async()
             self.par._city_name = None
             self.par._fetch_city_name()

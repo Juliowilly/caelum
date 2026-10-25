@@ -1248,3 +1248,50 @@ thick low cloud: 80% cirrus alone left the sun at ~33% and greyed the sky with t
   beyond the limit → MET forecast.
 - Possible next step, not done: METAR cloud groups (FEW/SCT/BKN/OVC) are real cloud data too.
   Today the airport said FEW while both models said 95 %.
+
+### Rain now: the most accurate free source for the user's location (unreleased)
+- The user found the airport change "too personal" (built around Lomé). The METAR lookup was
+  already location-independent, but radar beats an airport wherever radar exists, so the best
+  source really does depend on where the user is. Asked for: a script that picks the most
+  accurate free source for the location.
+- **New `core/rain_now.observe(lat, lon)`**: tries the sources in order of accuracy and keeps the
+  first that covers the place:
+  1. **MET Norway Nowcast 2.0** (`radar.met_nowcast`): radar + stations every 5 min, only asked
+     inside a Nordic box. It must report `radar_coverage: ok`. It gives `precipitation_rate`; snow
+     when the air is ≤ 1 °C.
+  2. **RainViewer** (`radar.rainviewer`): worldwide composite of national radars, free and keyless.
+     - Zoom 7 is the free maximum; zoom 8 returns a "Zoom Level Not Supported" image.
+     - Reads the **coverage tile** first: transparent = radar, black = none (Lomé is black). It is
+       cached 24 h per point.
+     - Then reads the latest radar frame (at most 30 min old) as a 3×3-pixel neighbourhood (~3 km).
+     - The free API serves only the "Universal Blue" palette, whatever scheme is asked for (scheme 0
+       came back in colour). Its colours map back to dBZ through RainViewer's published table,
+       generated into `caelum/data/radar_colors.json` by `packaging/make-radar-colors.py`. The table
+       has a rain half and a snow half, so a pixel also says rain or snow.
+     - Rate: Marshall–Palmer, Z = 200 R^1.6, from 15 dBZ. A neighbourhood mean under 0.1 mm/h
+       counts as dry (a stray pixel).
+     - A small pure-Python PNG reader (`png_pixels`) decodes straight (not premultiplied) RGBA.
+       Reading through cairo premultiplied the semi-transparent light-rain colours, so ⅓ of the
+       pixels missed the table.
+  3. **Nearest airport METAR** within 30 km, at most 90 min old (`metar`, from the previous step).
+  - None of them covers the place → the forecasts decide: MET Norway's next hour, then Open-Meteo.
+- **Thunder**: radar can't see lightning (`thunder: None`), so a shower seen by radar keeps the
+  model's thunderstorm code. An airport reports TS itself.
+- **Merge**: `rain_source` (met_radar | rainviewer | airport | met_forecast | om_forecast) plus
+  `rain_station` for airports.
+- **Window**: the `rain` source runs every 10 min in a thread. An observation older than 30 min
+  (the source stopped answering) is dropped, so the forecasts take over. It is cleared on
+  location change.
+- **Settings → Location → Weather Data → "Rain now"** shows the source in use, e.g. "Airport DXXX,
+  6 km away" or "Radar (RainViewer)", with a one-line explanation. fr/es/de/pt/it strings added.
+- **Live check, 25 Oct ~13:40 UTC**:
+  - Oslo and Bergen → MET radar. Bergen raining: 1.9 mm/h on MET, 1.28 on RainViewer; the others
+    dry on both.
+  - London, Paris, New York, Tokyo → RainViewer.
+  - Lomé → DXXX at 6 km. Nairobi → HKJK at 12 km.
+  - About 0.5–2 s per lookup.
+- Packaging: `data/*.json` added to the package data. README: sources (RainViewer credited) and
+  privacy (RainViewer only learns the ~300 km tile).
+- Tests made location-neutral (generic station ABCD; the garbled report kept as an anonymised
+  example). New tests: selector order and short-circuit, no Nordic request elsewhere, dBZ→rate,
+  PNG reader (straight alpha, edge clipping), palette sanity, airport naming. 68 pass.

@@ -40,4 +40,4 @@ exclude = ["caelum.kivy_ui*"]
 
 # Landscape photos (built by packaging/make-landscapes.py)
 [tool.setuptools.package-data]
-caelum = ["data/landscapes/*.jpg", "data/landscapes/*.png", "data/landscapes/*.json"]
+caelum = ["data/*.json", "data/landscapes/*.jpg", "data/landscapes/*.png", "data/landscapes/*.json"]
