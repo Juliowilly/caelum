@@ -276,14 +276,17 @@ class SkyTracker(Gtk.Window):
         GLib.timeout_add(500, self._force_fullscreen)
 
     def _force_fullscreen(self):
+        if self._win32:
+            # Windows: win32.py positions the window; a GTK move/resize at the same time leaves GTK
+            # waiting for a configure that never matches, and it stops drawing
+            self._place_on_desktop()
+            return False
         display = self.get_screen().get_display()
         monitor = display.get_primary_monitor() or display.get_monitor(0)
         if monitor:
             geo = monitor.get_geometry()
             self.move(geo.x, geo.y)
             self.resize(geo.width, geo.height)
-        if self._win32:
-            self._place_on_desktop()
         return False
 
     # ── Windows desktop ──────────────────────────────────────────────────────

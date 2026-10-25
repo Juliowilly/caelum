@@ -1637,3 +1637,8 @@ auto-hide, scaled to GTK pixels).
   once it sees WS_EX_LAYERED, which fails after our SetLayeredWindowAttributes. Caelum now logs
   frames drawn per 10 s and each click; the CI runs both modes with GTK's layered painting off
   and on (GDK_WIN32_LAYERED=0/1).
+- Variant run: GTK drew 1 frame, then 0 per 10 s, in all four variants (layered on or off), while
+  timers ran and clicks arrived. So GTK stops painting after placement; the clicks reached Caelum
+  but hit control positions never updated. Likely GtkWindow's frozen updates while it waits for
+  the configure of its own move/resize, raced by the Win32 placement. On Windows, GTK no longer
+  moves/resizes the sky (default size before show; win32.py positions it). CI back to layered 0.

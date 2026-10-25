@@ -37,7 +37,7 @@ $cfgDir = "$env:APPDATA\caelum"
 New-Item -ItemType Directory -Force $cfgDir | Out-Null
 $failed = @()
 # GDK_WIN32_LAYERED: Caelum sets 0 unless the environment has it; 1 tries GTK's layered painting
-$runs = foreach ($l in '0', '1') { foreach ($m in 'behind-icons', 'click-through-off') { ,@($m, $l) } }
+$runs = foreach ($l in '0') { foreach ($m in 'behind-icons', 'click-through-off') { ,@($m, $l) } }
 foreach ($run in $runs) {
     $place, $env:GDK_WIN32_LAYERED = $run
     $mode = "$place-layered$($env:GDK_WIN32_LAYERED)"
