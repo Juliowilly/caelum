@@ -1395,3 +1395,28 @@ The user asked to release 1.5.2: the wallpaper switch (every minute) and the Abo
 - PPA: `ppa-upload.sh` refused to run because of four untracked photos in the folder (the user's
   IMG_20261025_*.jpg, left untouched). The source is `git archive HEAD`, so the clean-tree check now
   ignores untracked files.
+
+### Personal landscapes (unreleased)
+
+The user asked to turn four of their own photos into a landscape. The photos and the landscape
+made from them stay on the user's machine: never in the repo or the packages.
+- **App**: landscapes are also read from `<data dir>/caelum/landscapes/`, in the shipped format
+  (`landscapes.json` + `<name>.jpg` + `<name>-mask.png`, plus an optional `label`).
+  - `sandbox.data_dir()`: in the snap it is `$SNAP_USER_COMMON/.local/share` (revision-independent,
+    like the cache); otherwise `$XDG_DATA_HOME` (Flatpak sets it per app).
+  - Shipped names win a clash; `hills`/`none` and odd names are refused.
+  - Settings lists them after the shipped landscapes.
+- **Bug fixed on the way**: `_PAD` 2 → 8. Shrinking the band ~2.5× with the GOOD filter reached
+  past the 2 transparent rows into the wrapped bottom row, drawing a thin dark line across the sky
+  at the band's top. The shipped bands escaped it only by their sub-pixel offset at 1080p.
+- **Building the landscape** (scratchpad tools, not committed: they need OpenCV):
+  - OpenCV's panorama stitcher joined the 4 phone shots (half size) into a ~74° view.
+  - The black border was filled: reflected lawn at the bottom, sky at the top. The edge rims
+    were trimmed, and the right edge stops before a brick pile so the mirror join runs along a
+    plain wall.
+  - Contrast ×1.12, colour ×1.12, brightness ×0.96 (the noon shots were hazy).
+  - Magnified ×1.6 vertically and stretched to 180° horizontally, then mirrored to close the
+    360° band, so both joins are seamless. South (0.25) faces the middle of the yard; top 28°.
+  - The sky was cut out with make-landscapes.py's `cutout()`; walls and roofs stay.
+  - Checked in renders at noon (facing the yard and away), sunset and night.
+- Tests: personal catalog (order, clashes, no folder). 80 pass.

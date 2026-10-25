@@ -11,7 +11,7 @@ from ..core.config import DEFAULT_CONFIG, save_config
 from ..core.geoip import detect_location
 from ..core.i18n import _LANG_OPTIONS, _set_lang, _t
 from .autostart import autostart_enabled, set_autostart
-from .landscape import available as available_landscapes
+from .landscape import available as available_landscapes, personal as personal_landscapes
 
 # ─── Timezone list ───────────────────────────────────────────────────────────
 # (utc_offset_hours, display_label)
@@ -205,6 +205,7 @@ class SettingsDialog(Gtk.Window):
         options = [(k, _t(lbl)) for k, lbl in (('plain', 'Plain with trees'), ('mountains', 'Mountains'),
                                                ('sea', 'Seaside'))
                    if k in available_landscapes()]
+        options += personal_landscapes()
         options += [('hills', _t('Drawn hills')), ('none', _t('None'))]
         for key, label in options:
             land_combo.append(key, label)

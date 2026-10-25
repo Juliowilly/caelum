@@ -48,6 +48,14 @@ def installed_update():
     return ''
 
 
+def data_dir():
+    """Where the user's own files live (e.g. landscapes made from their photos)."""
+    if kind() == 'snap':
+        # Revision-independent, so the files survive snap refreshes
+        return os.path.join(os.environ['SNAP_USER_COMMON'], '.local', 'share')
+    return os.environ.get('XDG_DATA_HOME') or os.path.expanduser('~/.local/share')
+
+
 def cache_dir():
     if kind() == 'snap':
         # Revision-independent, so the wallpaper path survives snap refreshes
