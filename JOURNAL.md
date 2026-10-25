@@ -859,3 +859,13 @@ thick low cloud: 80% cirrus alone left the sun at ~33% and greyed the sky with t
   forming deck; overcast/altostratus/sunset/night unchanged.
 - Time-lapse 60 %, 3-min steps: sun clear in 4 of 9 frames; night 60 %: clouds cross the moon.
 - 21 tests pass; pyflakes clean.
+
+### Release 1.2.0 (2026-10-25)
+- Version bump: `caelum/__init__.py` 1.2.0, `debian/changelog` 1.2.0-1, metainfo `<release>` with
+  notes; screenshot URLs pinned to the `v1.2.0` tag.
+- **Store screenshots re-rendered**: the 1.1.1 `day.png` (veiled sun at 55 %, Venus/Mercury in
+  daylight) and `sunset.png` showed exactly what this release fixes. Re-rendered off-screen
+  (scratch harness: `SkyTracker` with window/network stubbed, fixed UTC) with the same composition
+  (all cards on, facing S, Lomé, cover 55 % Lo35/Mid40/Hi25 at 10:00 and 45 % Lo25/Mid35/Hi20 at
+  17:35) and the live MET/Open-Meteo forecast, dated 2026-10-25 so the forecast weekdays match.
+  `night.png` (0 % cover) and `settings.png` are unaffected and kept. `dusk.png` stays unused.

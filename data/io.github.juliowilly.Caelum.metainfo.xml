@@ -40,23 +40,38 @@
   </supports>
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.1.1/data/screenshots/sunset.png</image>
+      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.2.0/data/screenshots/sunset.png</image>
       <caption>Sunset over the horizon with sunlit clouds, the moon and planets, and the weekly forecast</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.1.1/data/screenshots/night.png</image>
+      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.2.0/data/screenshots/night.png</image>
       <caption>A clear night with constellations, planets and the Milky Way</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.1.1/data/screenshots/day.png</image>
+      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.2.0/data/screenshots/day.png</image>
       <caption>A partly cloudy morning sky over the desktop</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.1.1/data/screenshots/settings.png</image>
+      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.2.0/data/screenshots/settings.png</image>
       <caption>Settings: language, autostart, size, and which cards to show</caption>
     </screenshot>
   </screenshots>
   <releases>
+    <release version="1.2.0" date="2026-10-25">
+      <description>
+        <p>More realistic clouds and a lighter load on the computer.</p>
+        <ul>
+          <li>The sun and moon are hidden only while a cloud is actually in front of them, instead of being dimmed by the cloud-cover percentage</li>
+          <li>Thin high cirrus no longer hides the sun or greys the sky</li>
+          <li>Low clouds fill the whole sky in perspective: big grey-bottomed clouds overhead, small cumulus toward the horizon</li>
+          <li>Clouds drift with the real wind direction and speed</li>
+          <li>Overcast skies show a grey cloud ceiling; a high, thin layer shows the sun as a dim disc</li>
+          <li>Planets appear with twilight instead of in daylight</li>
+          <li>Much lower CPU use: the cloud layer is cached and redrawn only when it changes</li>
+          <li>New screenshots</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.1.1" date="2026-10-22">
       <description>
         <ul>

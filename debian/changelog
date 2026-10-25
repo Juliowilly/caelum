@@ -1,3 +1,16 @@
+caelum (1.2.0-1) unstable; urgency=medium
+
+  * New upstream release 1.2.0.
+    - Sun and moon hidden only by clouds actually in front of them; thin
+      cirrus no longer veils the sun.
+    - Low clouds drawn in perspective across the whole sky, drifting with
+      the wind; overcast deck and altostratus sheet.
+    - Planets fade in with twilight instead of showing in daylight.
+    - Cloud layer cached at half resolution: much lower CPU use.
+    - New screenshots.
+
+ -- Juliowilly <jw.adamagaba@gmail.com>  Sun, 25 Oct 2026 09:32:27 +0000
+
 caelum (1.1.1-1) unstable; urgency=medium
 
   * New upstream release 1.1.1.
