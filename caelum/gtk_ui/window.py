@@ -321,12 +321,15 @@ class SkyTracker(Gtk.Window):
         """Keep the gear, compass and forecast off the taskbar: the sky covers the whole screen."""
         try:
             edges, screen_w = self._win32.taskbar_edges()
-        except Exception:
+        except Exception as e:
+            print(f'Caelum: no taskbar edges: {e}', file=sys.stderr, flush=True)
             return True
         width = self.da.get_allocation().width
         k = width / screen_w if width > 1 and screen_w else 1.0   # Windows pixels → GTK pixels
         insets = tuple(int(round(e * k)) for e in edges)
         if insets != self._insets:
+            print(f'Caelum: taskbar edges {edges} (screen {screen_w} px) → {insets} in GTK pixels',
+                  file=sys.stderr, flush=True)
             self._insets = insets
             self.da.queue_draw()
         return True
