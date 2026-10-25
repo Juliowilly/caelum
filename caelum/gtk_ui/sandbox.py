@@ -24,6 +24,30 @@ def kind():
     return None
 
 
+def installed_update():
+    """
+    Inside a snap: the version of a newer revision that snapd installed while this one kept
+    running (snapcraft.yaml `refresh-mode: ignore-running`), '' if its version can't be read,
+    or None when this is the current revision (or not a snap).
+    """
+    name, rev = os.environ.get('SNAP_NAME'), os.environ.get('SNAP_REVISION')
+    if kind() != 'snap' or not name or not rev:
+        return None
+    try:
+        if os.readlink(f'/snap/{name}/current') == rev:
+            return None
+    except OSError:
+        return None
+    try:
+        with open(f'/snap/{name}/current/meta/snap.yaml') as f:
+            for line in f:
+                if line.startswith('version:'):
+                    return line.split(':', 1)[1].strip().strip('\'"')
+    except OSError:
+        pass
+    return ''
+
+
 def cache_dir():
     if kind() == 'snap':
         # Revision-independent, so the wallpaper path survives snap refreshes

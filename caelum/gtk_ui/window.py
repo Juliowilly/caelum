@@ -98,6 +98,7 @@ class SkyTracker(Gtk.Window):
         self._moonrise = self._moonset = None
         self._meteors  = []
         self._storm    = wx.Storm()
+        self._update   = None    # version of a newer snap revision installed while running
         # Cloud layers' scroll offsets (screen widths); start where the wind left them
         self._drift   = {layer: time.time() / 600.0 * 0.618 % 4.0 for layer in _CLOUD_DRIFT}
         self._drift_t = time.monotonic()
@@ -116,6 +117,7 @@ class SkyTracker(Gtk.Window):
         self._fetch_city_name()
         GLib.timeout_add(100,              self._tick)
         GLib.timeout_add_seconds(5,        self._watch_weather)
+        GLib.timeout_add_seconds(60,       self._check_update)
         GLib.timeout_add(5 * 60 * 1000,  self._export_lockscreen_bg)
         try:
             Gio.NetworkMonitor.get_default().connect('network-changed', self._on_network_changed)
@@ -312,6 +314,14 @@ class SkyTracker(Gtk.Window):
             self._fetch_om_async()
         if wall >= self._due['met']:
             self._fetch_met_async()
+        return True
+
+    def _check_update(self):
+        """Every minute: has snapd installed a newer Caelum under us? Then ask for a restart."""
+        update = sandbox.installed_update()
+        if update != self._update:
+            self._update = update
+            self.da.queue_draw()
         return True
 
     def _on_resume(self):
@@ -723,6 +733,9 @@ class SkyTracker(Gtk.Window):
         self._draw_gear_btn(cr, gx, gy, 16)
         if self._exploring():
             self._draw_explore_hint(cr, gx - 30, gy)
+        elif self._update is not None and not self._exporting:
+            self._draw_hint(cr, gx - 30, gy, _t('Caelum {v} is installed · restart Caelum to use it').format(
+                v=self._update) if self._update else _t('Caelum was updated · restart it to use the new version'))
         self._update_input_region(W, H)
 
         # ── Constellation hover label
@@ -1257,7 +1270,10 @@ class SkyTracker(Gtk.Window):
 
     def _draw_explore_hint(self, cr, right, cy):
         """Small pill left of the gear while explore mode holds the desktop's clicks."""
-        text = _t('Exploring the sky · click empty sky or Esc to return to the desktop')
+        self._draw_hint(cr, right, cy, _t('Exploring the sky · click empty sky or Esc to return to the desktop'))
+
+    def _draw_hint(self, cr, right, cy, text):
+        """Small pill ending at x = right, centred on cy."""
         cr.select_font_face('Sans', cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
         cr.set_font_size(12)
         ext = cr.text_extents(text)

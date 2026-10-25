@@ -32,6 +32,10 @@ apps:
     common-id: io.github.juliowilly.Caelum
     # snapd starts this when ~/snap/caelum/current/.config/autostart/caelum.desktop exists
     autostart: caelum.desktop
+    # Caelum runs all session long; without this, snapd refuses `snap refresh` while it runs
+    # ("has running apps") and holds back automatic updates. The running copy keeps its
+    # revision and shows a "restart to use it" note; the next start picks up the new one.
+    refresh-mode: ignore-running
     extensions: [gnome]
     plugs:
       - network        # weather, place name, location detection

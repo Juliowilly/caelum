@@ -1175,3 +1175,25 @@ thick low cloud: 80% cirrus alone left the sun at ~33% and greyed the sky with t
   - The source tarball has no `compass_bridge.py` or `config.json`.
   - PPA 1.5.0-1 uploaded for noble and resolute.
   - Snap revision 7 → **beta**; stable stays at 1.4.0 (rev 6) until the user tests it.
+
+### Snap updates while Caelum runs (unreleased)
+- **Problem** (the user, testing the 1.5.0 beta): `snap refresh caelum --beta` failed with
+  `cannot refresh "caelum": snap "caelum" has running apps (caelum)`. Because of snapd's refresh
+  app awareness, a running app also holds back the automatic updates (up to 14 days). Caelum runs
+  all session long, so it was effectively never updated in the background.
+- **Fix**: `refresh-mode: ignore-running` on the app in `snapcraft.yaml`. snapcraft accepts it for
+  non-service apps. snapd then refreshes while Caelum runs; the running process keeps its own
+  revision, which snapd retains.
+- The confined app can't relaunch itself: executing `/snap/bin/caelum` (→ `/usr/bin/snap`) gives
+  "Permission denied" inside the sandbox, checked with `snap run --shell caelum`. So:
+  - `sandbox.installed_update()` compares `/snap/caelum/current` with `$SNAP_REVISION`. If they
+    differ, it reads the new version from `meta/snap.yaml`.
+  - `_check_update` runs every minute. When there is an update, a pill next to the gear says
+    "Caelum 1.5.1 is installed · restart Caelum to use it". It uses the same `_draw_hint` as the
+    explore pill, which wins while exploring; fr/es/de/pt/it strings added. It is not drawn into
+    the exported wallpaper.
+  - Autostart picks up the new revision at the next login anyway.
+- Checked: the logic with faked revisions (same rev → None, newer → '1.5.1', not a snap → None)
+  and a render of the pill. The real refresh path can only be checked once a build with this
+  setting is installed: snapd reads `refresh-mode` from the installed revision, so the update *to*
+  this version still needs Caelum closed one last time.
