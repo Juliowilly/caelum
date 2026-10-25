@@ -2,7 +2,7 @@ import unittest
 
 from caelum.core.astronomy import phase_index
 from caelum.core.sky import (
-    band_slots, cloud_layers, mid_sheet, opaque_cover, overcast_deck, set_facing, sky_to_screen, veil_transmission,
+    band_slots, cloud_layers, mid_sheet, naked_eye_visibility, opaque_cover, overcast_deck, set_facing, sky_to_screen, veil_transmission,
 )
 
 W, H = 1000, 500
@@ -74,6 +74,21 @@ class CloudOpticsTest(unittest.TestCase):
         less = set(band_slots('low', 30, 4.0, 0.14))
         more = set(band_slots('low', 60, 4.0, 0.14))
         self.assertTrue(less <= more)
+
+
+class PlanetVisibilityTest(unittest.TestCase):
+    def test_no_planets_in_daylight(self):
+        for mag in (-4.0, -2.2, -1.0, 0.0, 0.7):          # Venus … Saturn
+            self.assertEqual(naked_eye_visibility(mag, 30.0), 0.0)
+            self.assertEqual(naked_eye_visibility(mag, 10.0), 0.0)
+
+    def test_twilight_order(self):
+        # Around sunset Venus is already showing; the fainter planets come later
+        self.assertGreater(naked_eye_visibility(-4.0, 0.0), 0.0)
+        self.assertEqual(naked_eye_visibility(0.7, 0.0), 0.0)
+        self.assertEqual(naked_eye_visibility(-2.2, -3.5), 1.0)
+        self.assertEqual(naked_eye_visibility(0.7, -8.0), 1.0)
+
 
 if __name__ == '__main__':
     unittest.main()

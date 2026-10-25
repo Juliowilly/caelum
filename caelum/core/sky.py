@@ -73,6 +73,25 @@ def sky_color(el):
     if el < 50:    return _lerp(S['morning'],  S['noon'],     (el - 20) / 30)
     return S['noon']
 
+# ─── Sky brightness ──────────────────────────────────────────────────────────
+# Faintest naked-eye magnitude by sun elevation (°): daylight hides everything but the moon,
+# Venus appears around sunset, then Jupiter, Mars, and the rest as twilight deepens.
+_LIMIT_MAG = ((10.0, -4.6), (0.0, -3.5), (-3.0, -1.5), (-6.0, 1.0),
+              (-9.0, 3.0), (-12.0, 4.5), (-18.0, 6.0))
+
+def limiting_magnitude(sun_el):
+    pts = _LIMIT_MAG
+    if sun_el >= pts[0][0]:
+        return pts[0][1]
+    for (e0, m0), (e1, m1) in zip(pts, pts[1:]):
+        if sun_el >= e1:
+            return m0 + (m1 - m0) * (e0 - sun_el) / (e0 - e1)
+    return pts[-1][1]
+
+def naked_eye_visibility(mag, sun_el):
+    """0–1: fades in over one magnitude as the sky darkens past the object's brightness."""
+    return _clamp(limiting_magnitude(sun_el) - mag, 0.0, 1.0)
+
 # ─── Cloud optics ────────────────────────────────────────────────────────────
 # Cloud cover is a fraction of sky area, not a dimmer: where there is no cloud the sun
 # is at full strength. Each layer blocks a different share of the light where it is.

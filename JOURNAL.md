@@ -808,3 +808,15 @@ thick low cloud: 80% cirrus alone left the sun at ~33% and greyed the sky with t
 - 1920×1080 overcast: full cloud re-render on a drift step 256 → 80 ms after the deck texture
   (happens ~every 1.5 s at 4 m/s); cached frames ~27 ms.
 - 16 tests pass (deck/sheet thresholds); pyflakes clean.
+
+### Planets no longer drawn in daylight
+- Before: planets were drawn whenever above the horizon (only clouds hid them), so Venus and Mercury
+  sat next to the noon sun.
+- `core.sky.limiting_magnitude(sun_el)`: faintest naked-eye magnitude, interpolated through
+  (sun el °, mag) = (10, −4.6) (0, −3.5) (−3, −1.5) (−6, 1.0) (−9, 3.0) (−12, 4.5) (−18, 6.0).
+  `naked_eye_visibility(mag, sun_el)` fades an object in over one magnitude past that limit.
+- `_draw_planets(…, sun_el)` multiplies glow, disc, Saturn's ring and label alpha by it (planet
+  magnitudes are the fixed `_PLANET_MAG` values). Result: none in daylight; around sunset Venus
+  (−4.0) first, then Jupiter (≈ −2° sun), Mars (≈ −4°), Mercury/Saturn (≈ −6°…−7°).
+- Verified: clear-sky renders 12:00 → 18:45 UTC facing the sunset: no planets at noon or sunset,
+  Mercury fades in at −6.3°, stars follow. 2 new tests (none in daylight, twilight order); 18 pass.

@@ -27,7 +27,7 @@ from ..core.config import DEFAULT_CONFIG, load_config, save_config
 from ..core.i18n import _PHASE_NAMES, _day_name, _fmt_date, _t
 from ..core.sky import (
     _clamp, _cloud_palette, _seg_dist, cloud_layers, get_facing,
-    mid_sheet, moon_brightness, overcast_deck, set_facing, sky_color_adaptive, sky_to_screen,
+    mid_sheet, moon_brightness, naked_eye_visibility, overcast_deck, set_facing, sky_color_adaptive, sky_to_screen,
     veil_transmission,
 )
 from ..core.weather import (
@@ -573,7 +573,7 @@ class SkyTracker(Gtk.Window):
             planets = planet_positions(lat, lon, utc)
             if sky_vis < 0.999:
                 cr.push_group()
-            self._draw_planets(cr, W, H, planets, scale)
+            self._draw_planets(cr, W, H, planets, scale, sun_el)
             if sky_vis < 0.999:
                 cr.pop_group_to_source()
                 cr.paint_with_alpha(sky_vis)
@@ -1188,39 +1188,40 @@ class SkyTracker(Gtk.Window):
 
     # ── Planets ──────────────────────────────────────────────────────────────
 
-    def _draw_planets(self, cr, W, H, planets, scale):
+    def _draw_planets(self, cr, W, H, planets, scale, sun_el):
         for name, el, az, col in planets:
-            if el <= 0:
+            mag = _PLANET_MAG.get(name, 0.0)
+            vis = naked_eye_visibility(mag, sun_el)   # hidden by daylight / bright twilight
+            if el <= 0 or vis <= 0.01:
                 continue
             pos = sky_to_screen(el, az, W, H)
             if pos is None:
                 continue
             px, py = pos
             r, g, b = col
-            mag    = _PLANET_MAG.get(name, 0.0)
             radius = max(3.5, (5.5 - mag * 0.50)) * scale
             glow = cairo.RadialGradient(px, py, 0, px, py, radius * 3.5)
-            glow.add_color_stop_rgba(0.0, r, g, b, 0.60)
-            glow.add_color_stop_rgba(0.5, r, g, b, 0.22)
+            glow.add_color_stop_rgba(0.0, r, g, b, 0.60 * vis)
+            glow.add_color_stop_rgba(0.5, r, g, b, 0.22 * vis)
             glow.add_color_stop_rgba(1.0, r, g, b, 0.00)
             cr.arc(px, py, radius * 3.5, 0, 2 * math.pi)
             cr.set_source(glow)
             cr.fill()
-            cr.set_source_rgba(r, g, b, 0.95)
+            cr.set_source_rgba(r, g, b, 0.95 * vis)
             cr.arc(px, py, radius, 0, 2 * math.pi)
             cr.fill()
             if name == 'Saturn':
                 cr.save()
                 cr.translate(px, py)
                 cr.scale(1.0, 0.32)
-                cr.set_source_rgba(r, g, b, 0.50)
+                cr.set_source_rgba(r, g, b, 0.50 * vis)
                 cr.set_line_width(radius * 0.55)
                 cr.arc(0, 0, radius * 2.1, 0, 2 * math.pi)
                 cr.stroke()
                 cr.restore()
             cr.select_font_face('Sans', cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
             cr.set_font_size(9 * scale)
-            cr.set_source_rgba(r, g, b, 0.72)
+            cr.set_source_rgba(r, g, b, 0.72 * vis)
             cr.move_to(px + radius + 3, py + 4)
             cr.show_text(name)
 
