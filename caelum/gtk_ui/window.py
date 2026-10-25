@@ -51,6 +51,8 @@ _LOW_WIND_FACTOR = 1.5
 _REFRESH = {'om': 15 * 60, 'met': 60 * 60}
 _RETRY   = (15, 30, 60, 120, 300)   # back-off after a failed fetch (s)
 _SLEPT   = 60   # wall time the monotonic clock missed beyond this → the system was asleep
+# Explore mode (click-through on): seconds without pointer motion before the sky lets clicks through again
+_EXPLORE_IDLE = 20
 
 class SkyTracker(Gtk.Window):
 
@@ -79,6 +81,7 @@ class SkyTracker(Gtk.Window):
         self._selected_day_slots = []     # hourly slots for selected day (cached in _on_click)
         self._weekly_card_rects  = []     # [(date_str, x, y, w, h), ...]
         self._input_rects        = ()     # input region last applied (see _update_input_region)
+        self._explore_until      = 0.0    # monotonic deadline of explore mode (whole sky takes input)
         self._city_name          = None   # reverse-geocoded city name
         self._moon_limb_angle    = 0.0    # stored each frame for use in info card icon
         self._today_str          = datetime.date.today().isoformat()
@@ -443,6 +446,10 @@ class SkyTracker(Gtk.Window):
         if ctrl and k in (ord('q'), ord('Q')):
             Gtk.main_quit()
             return True
+        if k == Gdk.KEY_Escape and self._exploring():
+            self._explore_until = 0.0
+            self.da.queue_draw()
+            return True
         return False
 
     def _on_click(self, _w, ev):
@@ -458,7 +465,7 @@ class SkyTracker(Gtk.Window):
             facing = (math.degrees(math.atan2(dx, -dy)) + 360) % 360
             self.cfg['facing'] = round(facing, 1)
             save_config(self.cfg)
-            self.da.queue_draw()
+            self._start_explore()
             return True
         # Click on a weekly forecast day card
         if self.cfg.get('show_weekly_forecast', True):
@@ -473,8 +480,14 @@ class SkyTracker(Gtk.Window):
                         self._selected_day_slots = [
                             s for s in all_h if s.get('ts', '')[:10] == date_str
                         ][:8]
-                    self.da.queue_draw()
+                    self._start_explore()
                     return True
+        if self._exploring() and ev.button == 1:
+            # Click on empty sky ends explore mode; later clicks reach the desktop again
+            self._explore_until = 0.0
+            self._selected_day  = None
+            self.da.queue_draw()
+            return True
         if ev.button == 3:
             self._open_settings()
             return True
@@ -484,8 +497,19 @@ class SkyTracker(Gtk.Window):
             self.da.queue_draw()
         return False
 
+    def _start_explore(self):
+        """After a click on the compass or a card the whole sky takes input for a while,
+        so constellation names show on hover even with click-through on."""
+        self._explore_until = time.monotonic() + _EXPLORE_IDLE
+        self.da.queue_draw()
+
+    def _exploring(self):
+        return self.cfg.get('click_through', True) and time.monotonic() < self._explore_until
+
     def _on_motion(self, _w, ev):
         self._mouse_x, self._mouse_y = ev.x, ev.y
+        if self._exploring():
+            self._explore_until = time.monotonic() + _EXPLORE_IDLE
         if self.cfg.get('show_constellations', True) and self._star_screen_cache:
             new_hover = self._hit_test_constellation(ev.x, ev.y)
         else:
@@ -510,7 +534,7 @@ class SkyTracker(Gtk.Window):
         """Click-through: the window takes input only on its controls, so clicks on the sky
         reach the desktop icons and windows below. Without it the whole screen is hit-testable."""
         cfg = self.cfg
-        if not cfg.get('click_through', True):
+        if not cfg.get('click_through', True) or self._exploring():
             rects = None
         else:
             r = 22
@@ -695,6 +719,8 @@ class SkyTracker(Gtk.Window):
 
         # ── Gear / settings button
         self._draw_gear_btn(cr, gx, gy, 16)
+        if self._exploring():
+            self._draw_explore_hint(cr, gx - 30, gy)
         self._update_input_region(W, H)
 
         # ── Constellation hover label
@@ -1154,6 +1180,20 @@ class SkyTracker(Gtk.Window):
         cr.arc(0, 0, r * 0.22, 0, 2 * math.pi)
         cr.fill()
         cr.restore()
+
+    def _draw_explore_hint(self, cr, right, cy):
+        """Small pill left of the gear while explore mode holds the desktop's clicks."""
+        text = _t('Exploring the sky · click empty sky or Esc to return to the desktop')
+        cr.select_font_face('Sans', cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+        cr.set_font_size(12)
+        ext = cr.text_extents(text)
+        w, h = ext.x_advance + 20, 24
+        self._rrect(cr, right - w, cy - h / 2, w, h, 12)
+        cr.set_source_rgba(0.04, 0.05, 0.12, 0.58)
+        cr.fill()
+        cr.set_source_rgba(1, 1, 1, 0.85)
+        cr.move_to(right - w + 10, cy + 4)
+        cr.show_text(text)
 
     def _draw_const_label(self, cr, mx, my, name, W, H):
         cr.select_font_face('Sans', cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)

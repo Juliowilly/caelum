@@ -928,3 +928,17 @@ thick low cloud: 80% cirrus alone left the sun at ~33% and greyed the sky with t
 - **Verified**: live run with default config: 9 rects (gear, compass, 7 day cards). Clean mode → 2.
   Switch off → region reset to the whole window. 21 tests pass, pyflakes clean. Whether clicks actually
   pass through on the user's GNOME Wayland desktop is still **to be confirmed by the user**.
+
+### Explore mode: constellation names with click-through on (unreleased)
+- User asked to get hover names back after clicking the compass or a card.
+- A click on the compass or a forecast day card calls `_start_explore`. For `_EXPLORE_IDLE` (20 s) the
+  input region is dropped, so the whole sky takes input again (hover names, right-click → Settings).
+  Each pointer motion over the sky extends the deadline. Explore mode ends when the deadline passes,
+  on a left click on empty sky (consumed; it also deselects the day), or on Esc. The 100 ms tick
+  redraws, and `_update_input_region` restores the control rects within a frame.
+- While it is active, a pill left of the gear says "Exploring the sky · click empty sky or Esc to return to
+  the desktop" (fr/es/de/pt). This tells the user why the desktop isn't responding.
+- **Verified** (live run, pointer motion stubbed out, idle shortened to 3 s): 9 rects → card click →
+  whole window, day selected → idle → 9 rects. Explore + empty-sky click → 9 rects. Hint rendered and
+  checked. 21 tests pass, pyflakes clean. Note: in a live run a real pointer moving over the window
+  keeps explore mode on, which is the intended behaviour.
