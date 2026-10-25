@@ -195,15 +195,16 @@ def merge_weather(om, met):
         else:
             result['total'] = met_total
             result['low']   = 0; result['mid'] = met_total; result['high'] = 0
-        # Precipitation: take the higher value (if either detects rain, show it)
-        result['precip'] = max(result.get('precip', 0.0), met['precip'])
-        if result['precip'] > 0 and result['total'] == 0:
-            result['total'] = 60; result['low'] = 60
-        # Snow: either source can detect it
-        result['snow'] = result.get('snow', False) or met['snow']
-        # WMO: prefer MET Norway when it has a specific code
-        if met['wmo'] > 0:
-            result['wmo'] = met['wmo']
+        # Rain, snow and the weather code *now* come from Open-Meteo: a 15-minute estimate of
+        # the current state, where MET Norway gives the coming hour's forecast from a run that
+        # can be hours old. Taking either source's rain made the screen rain on dry afternoons
+        # whenever that old forecast still said "heavy rain". MET only fills in without Open-Meteo.
+        if om is None:
+            result['precip'] = met['precip']
+            result['snow']   = met['snow']
+            result['wmo']    = met['wmo']
+            if result['precip'] > 0 and result['total'] == 0:
+                result['total'] = 60; result['mid'] = 60
         # Forecast and daily forecast come only from MET Norway
         result['forecast']        = met.get('forecast', [])
         result['hourly_forecast'] = met.get('hourly_forecast', [])

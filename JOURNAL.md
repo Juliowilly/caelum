@@ -1197,3 +1197,19 @@ thick low cloud: 80% cirrus alone left the sun at ~33% and greyed the sky with t
   and a render of the pill. The real refresh path can only be checked once a build with this
   setting is installed: snapd reads `refresh-mode` from the installed revision, so the update *to*
   this version still needs Caelum closed one last time.
+
+### Rain on screen but not outside (unreleased)
+- **Report** (25 Oct, ~13:15 UTC, Lomé): the app showed rain, but outside it was dry.
+- **Data at that moment**:
+  - Open-Meteo `current` (15-minute estimate of now): 95 % cloud, 0 mm, WMO 3 (overcast). Its next
+    hour, in 15-minute steps, was dry too.
+  - MET Norway: `next_1_hours` of the 13:00 step said **heavyrain, 1.0 mm**, from a run updated
+    at 11:18; dry from 14:00.
+- **Cause**: `merge_weather` took the *larger* precipitation of the two sources and preferred MET's
+  weather code. So a two-hour-old forecast of rain for the coming hour overrode a fresh "dry now".
+- **Fix**: rain, snow and the weather code for *now* come from Open-Meteo whenever it answered;
+  MET fills them in only when Open-Meteo is unreachable. MET still provides temperature, humidity,
+  wind and all the forecast cards. Neither source observes anything in Togo (no radar or gauges
+  in the feed; both are models), but Open-Meteo's is the fresher estimate.
+- `tests/test_weather.py` (4 tests, the first being the 25 Oct case): 49 pass.
+  Live check after the fix: 0.0 mm, WMO 3, cloud 92 %.
