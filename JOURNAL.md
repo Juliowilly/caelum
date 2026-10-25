@@ -1057,3 +1057,11 @@ thick low cloud: 80% cirrus alone left the sun at ~33% and greyed the sky with t
   the Sky tab screenshot; the migration (silhouette off → none, on → plain); 8 new tests (lighting
   model, shipped data complete and covering the screen). 34 tests pass, including inside the
   .deb build; pyflakes clean.
+### Release 1.3.1 (2026-10-25)
+- The user asked to release every version in turn: 1.3.0 (snap promoted to stable, rev 4), then 1.3.1
+  (Settings redesign only), then 1.4.0 (landscapes).
+- 1.3.1 is built from branch `release-1.3.1` at `017cb4a` (the Settings commit). Master already had the
+  landscapes on top. The branch is merged back into master afterwards.
+- Version bump: `__init__.py`, `debian/changelog` 1.3.1-1, metainfo release notes, screenshots pinned
+  to `v1.3.1`. `settings.png` is now the new dialog (Sky tab, captured from this code) over
+  `night.png`, the same composition as before.
