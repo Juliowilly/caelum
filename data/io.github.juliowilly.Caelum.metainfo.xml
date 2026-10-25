@@ -40,27 +40,36 @@
   </supports>
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.5.2/data/screenshots/sunset.png</image>
+      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.5.3/data/screenshots/sunset.png</image>
       <caption>Sunset over a tree-lined plain with sunlit clouds, the moon and planets, and the weekly forecast</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.5.2/data/screenshots/night.png</image>
+      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.5.3/data/screenshots/night.png</image>
       <caption>A clear night with constellations, planets and the Milky Way</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.5.2/data/screenshots/rain.png</image>
+      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.5.3/data/screenshots/rain.png</image>
       <caption>Rain over the mountains: the distance fades into the downpour</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.5.2/data/screenshots/day.png</image>
+      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.5.3/data/screenshots/day.png</image>
       <caption>A partly cloudy morning sky over the desktop</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.5.2/data/screenshots/settings.png</image>
+      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.5.3/data/screenshots/settings.png</image>
       <caption>Settings: the Sky tab, with the opaque sky and the choice of landscape</caption>
     </screenshot>
   </screenshots>
   <releases>
+    <release version="1.5.3" date="2026-10-25">
+      <description>
+        <p>Your own landscape.</p>
+        <ul>
+          <li>Caelum also shows landscapes you make from your own photos, kept in your personal data folder; they never leave your computer</li>
+          <li>Fixed a thin line that could appear across the sky above a landscape</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.5.2" date="2026-10-25">
       <description>
         <p>A simpler, livelier wallpaper.</p>

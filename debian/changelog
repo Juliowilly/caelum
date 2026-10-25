@@ -1,3 +1,13 @@
+caelum (1.5.3-1) unstable; urgency=medium
+
+  * New upstream release 1.5.3.
+    - Personal landscapes: read from <data dir>/caelum/landscapes/ (in the
+      snap, its revision-independent common folder) and listed in Settings
+      after the shipped ones.
+    - Fixed a thin line across the sky at the top of a landscape band.
+
+ -- Juliowilly <jw.adamagaba@gmail.com>  Sun, 25 Oct 2026 14:39:39 +0000
+
 caelum (1.5.2-1) unstable; urgency=medium
 
   * New upstream release 1.5.2.

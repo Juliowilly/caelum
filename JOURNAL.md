@@ -1420,3 +1420,9 @@ made from them stay on the user's machine: never in the repo or the packages.
   - The sky was cut out with make-landscapes.py's `cutout()`; walls and roofs stay.
   - Checked in renders at noon (facing the yard and away), sunset and night.
 - Tests: personal catalog (order, clashes, no folder). 80 pass.
+
+### Release 1.5.3 (2026-10-25)
+
+The user asked to release 1.5.3: personal landscapes and the landscape-edge line fix. Version bump
+in `__init__`, debian/changelog, metainfo (screenshots pinned to v1.5.3, not re-rendered: the
+shipped landscapes look the same).
