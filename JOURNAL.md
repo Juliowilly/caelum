@@ -1213,3 +1213,38 @@ thick low cloud: 80% cirrus alone left the sun at ~33% and greyed the sky with t
   in the feed; both are models), but Open-Meteo's is the fresher estimate.
 - `tests/test_weather.py` (4 tests, the first being the 25 Oct case): 49 pass.
   Live check after the fix: 0.0 mm, WMO 3, cloud 92 %.
+
+### Rain from real observations: nearest airport, then MET Norway (unreleased)
+- The user disagreed with the previous fix: Open-Meteo is not accurate for rain, and they wanted
+  MET Norway's *real* data, not its forecast.
+- **Checked**:
+  - MET's radar-based Nowcast 2.0 answers HTTP 422 for Lomé; it covers the Nordic countries only
+    (OK for Oslo).
+  - `locationforecast`'s `instant` block (temperature, pressure, cloud, humidity, wind) has no
+    precipitation. Rain only exists there as `next_1_hours`, a forecast.
+  - So MET has no measured rain for Togo.
+  - The real observation available is **METAR** from Lomé airport (DXXX, 5.6 km away), every
+    30 min, free, no key, through aviationweather.gov's API.
+  - Today 07:30–13:00 it reported no rain and FEW017. Both models said ~95 % cloud.
+  - The 13:00 report was garbled: two METARs run together, `Q110`.
+- **The user chose**: the airport observation first; without one, MET Norway; Open-Meteo last.
+- **New `core/metar.py`**:
+  - `fetch_metar` queries a ±0.3° box around the rounded coordinates. It returns `[]` when there is
+    no station and `None` on network failure, so retries back off only on real failures.
+  - `parse(raw)` reads the present-weather groups (`-RA`, `+SHRA`, `TSRA`, `DZ`, `-SN`, `TS`…)
+    up to RMK/NOSIG/BECMG/TEMPO. It ignores vicinity (VCSH) and recent (RERA) weather, and rejects
+    malformed reports (bad header, two METARs in one).
+  - Rates: light/moderate/heavy rain 0.5/2.5/8 mm/h, drizzle 0.1/0.3/0.6.
+  - `nearest` takes the latest good report of the nearest airport within 30 km, at most 90 min old.
+- **`merge_weather(om, met, obs)`**: the observation sets precip, snow and WMO; `_observed_wmo`
+  keeps the model's cloud code but strips any rain code when the airport is dry. Without an
+  observation, MET's next-hour forecast decides. Open-Meteo decides only alone.
+- **Window**: a third source `metar`, due every 10 min, with the same back-off/resume/network
+  handling. It is cleared on location change.
+- README: data sources and privacy line updated.
+- Tests rewritten and extended (merge order, the real Lomé reports including the garbled one,
+  intensities, thunder/snow, vicinity/trend/remarks, nearest/too far/too old): 59 pass.
+- Live: Lomé → airport dry → no rain on screen. Kara → DXNG at 26 km used. Oslo → ENGM is ~35 km,
+  beyond the limit → MET forecast.
+- Possible next step, not done: METAR cloud groups (FEW/SCT/BKN/OVC) are real cloud data too.
+  Today the airport said FEW while both models said 95 %.

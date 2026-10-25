@@ -32,6 +32,7 @@ from ..core.sky import (
 from ..core.weather import (
     _NO_CLOUDS, _WX_ACCENT, _WX_LABEL, fetch_met_norway, fetch_open_meteo, merge_weather,
 )
+from ..core import metar
 from ..core.net import coord, get_json
 from .clouds import (
     _soft_puff, draw_altocumulus, draw_cirrus, draw_cumulus, draw_deck, draw_mid_sheet,
@@ -50,7 +51,7 @@ _LOW_WIND_FACTOR = 1.5
 
 # Weather refresh intervals (s). Kept on the wall clock: GLib timers use the monotonic clock,
 # which stops during suspend/hibernate, so a 1 h timer would still wait ~1 h after resume.
-_REFRESH = {'om': 15 * 60, 'met': 60 * 60}
+_REFRESH = {'om': 15 * 60, 'met': 60 * 60, 'metar': 10 * 60}   # airports report every 30–60 min
 _RETRY   = (15, 30, 60, 120, 300)   # back-off after a failed fetch (s)
 _SLEPT   = 60   # wall time the monotonic clock missed beyond this → the system was asleep
 # Explore mode (click-through on): seconds without pointer motion before the sky lets clicks through again
@@ -69,10 +70,12 @@ class SkyTracker(Gtk.Window):
         self._last_weather_ts  = ''   # last merged ts; changes when either source updates
         self._last_om          = None # last Open-Meteo raw result
         self._last_met         = None # last MET Norway raw result
+        self._last_metar       = None # last airport reports around the location (list)
         self._om_fetching      = False
         self._met_fetching     = False
-        self._due   = {'om': 0.0, 'met': 0.0}   # wall time each source is next fetched
-        self._fails = {'om': 0, 'met': 0}       # consecutive failed fetches per source
+        self._metar_fetching   = False
+        self._due   = {'om': 0.0, 'met': 0.0, 'metar': 0.0}   # wall time each source is next fetched
+        self._fails = {'om': 0, 'met': 0, 'metar': 0}         # consecutive failed fetches per source
         self._clock = (time.time(), time.monotonic())
         self._export_pending = False            # export the wallpaper once fresh weather lands
         self._hover_const  = None
@@ -314,6 +317,8 @@ class SkyTracker(Gtk.Window):
             self._fetch_om_async()
         if wall >= self._due['met']:
             self._fetch_met_async()
+        if wall >= self._due['metar']:
+            self._fetch_metar_async()
         return True
 
     def _check_update(self):
@@ -326,8 +331,8 @@ class SkyTracker(Gtk.Window):
 
     def _on_resume(self):
         """Back from sleep: refetch everything now and refresh the exported wallpaper."""
-        self._due   = {'om': 0.0, 'met': 0.0}
-        self._fails = {'om': 0, 'met': 0}
+        self._due   = {'om': 0.0, 'met': 0.0, 'metar': 0.0}
+        self._fails = {'om': 0, 'met': 0, 'metar': 0}
         self._astro_cache = None
         self._cloud_key   = None
         self._export_pending = True
@@ -336,7 +341,7 @@ class SkyTracker(Gtk.Window):
     def _on_network_changed(self, monitor, available):
         """Network back (typical just after resume): retry failed sources without waiting."""
         if available:
-            for src in ('om', 'met'):
+            for src in ('om', 'met', 'metar'):
                 if self._fails[src]:
                     self._due[src] = 0.0
 
@@ -350,7 +355,8 @@ class SkyTracker(Gtk.Window):
             self._fails[src] += 1
 
     def _weather_updated(self):
-        merged = merge_weather(self._last_om, self._last_met)
+        obs = metar.nearest(self._last_metar or [], self.cfg['latitude'], self.cfg['longitude'])
+        merged = merge_weather(self._last_om, self._last_met, obs)
         if merged is not None:
             self._apply_clouds(merged)
             if self._export_pending:
@@ -358,9 +364,10 @@ class SkyTracker(Gtk.Window):
                 self._export_lockscreen_bg()
 
     def _fetch_weather_async(self):
-        """Fetch both sources at once — used at startup and after location change."""
+        """Fetch every source at once — used at startup and after location change."""
         self._fetch_om_async()
         self._fetch_met_async()
+        self._fetch_metar_async()
         return True
 
     def _fetch_om_async(self):
@@ -400,6 +407,26 @@ class SkyTracker(Gtk.Window):
         self._fetched('met', result is not None)
         if result is not None:
             self._last_met = result
+            self._weather_updated()
+        return False
+
+    def _fetch_metar_async(self):
+        """Fetch the nearest airports' observations (is it actually raining?); due every 10 min."""
+        if self._metar_fetching:
+            return True
+        self._metar_fetching = True
+        lat, lon = self.cfg['latitude'], self.cfg['longitude']
+        def _work():
+            result = metar.fetch_metar(lat, lon)
+            GLib.idle_add(self._apply_metar, result)
+        threading.Thread(target=_work, daemon=True).start()
+        return True
+
+    def _apply_metar(self, result):
+        self._metar_fetching = False
+        self._fetched('metar', result is not None)
+        if result is not None:
+            self._last_metar = result
             self._weather_updated()
         return False
 

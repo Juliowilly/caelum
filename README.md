@@ -149,14 +149,15 @@ Settings are saved to `~/.config/caelum/config.json` (an older `config.json` nex
 
 | Data | Source |
 |---|---|
-| Weather (clouds, rain, temp) | [Open-Meteo](https://open-meteo.com) + [MET Norway](https://api.met.no) |
+| Weather (clouds, temp, wind, forecast) | [Open-Meteo](https://open-meteo.com) + [MET Norway](https://api.met.no) |
+| Is it raining now? | The nearest airport's observations (METAR, within 30 km) via [aviationweather.gov](https://aviationweather.gov/data/api/); without one, MET Norway's forecast for the coming hour |
 | Astronomy | Meeus *Astronomical Algorithms* |
 | City name | [Nominatim](https://nominatim.openstreetmap.org) (OpenStreetMap) |
 | Settings → Detect location | [ipwho.is](https://ipwho.is), falling back to [ipapi.co](https://ipapi.co) (only when you click it) |
 
 All sources are free and require no API key or account.
 
-**Privacy**: all requests use HTTPS. The weather and city-name services receive your coordinates
+**Privacy**: all requests use HTTPS. The weather, airport-report and city-name services receive your coordinates
 rounded to 2 decimals (about 1 km), never more precise. Nothing else about you is sent, and Caelum
 collects no statistics.
 

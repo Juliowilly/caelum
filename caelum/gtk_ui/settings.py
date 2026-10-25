@@ -437,6 +437,7 @@ class SettingsDialog(Gtk.Window):
             self.par._selected_day_slots = []
             self.par._last_om  = None
             self.par._last_met = None
+            self.par._last_metar = None
             self.par._fetch_weather_async()
             self.par._city_name = None
             self.par._fetch_city_name()
