@@ -1082,3 +1082,9 @@ thick low cloud: 80% cirrus alone left the sun at ~33% and greyed the sky with t
 - New screenshots: day, sunset and night with the plain landscape. `settings.png` is the Sky tab
   with the Landscape row, over the new night shot. Metainfo captions updated, URLs pinned to `v1.4.0`.
 - Version bump: `__init__.py`, `debian/changelog` 1.4.0-1, metainfo release notes.
+- **Released**:
+  - GitHub `v1.4.0` with the deb, snap and flatpak; the downloaded assets' SHA-256 match the local builds.
+  - The deb and snap both ship all 7 landscape files. Flatpak installed locally reports 1.4.0 and has them.
+  - PPA 1.4.0-1 uploaded for noble and resolute.
+  - Snap revision 6 → **beta**. 1.3.1 (rev 5) is also beta-only. Stable stays at 1.3.0 (rev 4)
+    until the user tests the beta.
