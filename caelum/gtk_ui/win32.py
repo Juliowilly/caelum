@@ -113,13 +113,24 @@ def _icon_layer():
     return (found[0], None) if found else None
 
 
-def _primary_rect():
-    """Primary monitor (x, y, w, h) in virtual-screen coordinates, as the icon layer's client
-    area counts them."""
+def taskbar_edges():
+    """((left, top, right, bottom) of the primary monitor covered by the taskbar, monitor width)."""
+    info = _primary_info()
+    m, w = info.rcMonitor, info.rcWork
+    return (w.left - m.left, w.top - m.top, m.right - w.right, m.bottom - w.bottom), m.right - m.left
+
+
+def _primary_info():
     info = _MONITORINFO(cbSize=ctypes.sizeof(_MONITORINFO))
     mon = user32.MonitorFromPoint(wintypes.POINT(0, 0), _MONITOR_DEFAULTTOPRIMARY)
     user32.GetMonitorInfoW(mon, ctypes.byref(info))
-    r = info.rcMonitor
+    return info
+
+
+def _primary_rect():
+    """Primary monitor (x, y, w, h) in virtual-screen coordinates, as the icon layer's client
+    area counts them."""
+    r = _primary_info().rcMonitor
     return r.left, r.top, r.right - r.left, r.bottom - r.top
 
 

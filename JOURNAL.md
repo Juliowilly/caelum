@@ -1606,3 +1606,11 @@ Releases; (3) built on GitHub Actions. This session: step 1, on the `windows` br
   modes, the wallpaper restored on quit, autostart, wallpaper export, older Windows (10, 11
   before 24H2: the WorkerW path), several monitors, display scaling, SmartScreen on the unsigned
   exe. These need the user's test on a real Windows PC.
+
+### First test on the user's Windows PC
+
+The user downloaded the zip (from the run's artifacts: signed-in GitHub, two nested zips) and ran
+it. The gear was under the taskbar and couldn't be clicked: the sky covers the whole monitor. The
+sky stays full-screen, but the gear, compass and forecast column now keep out of the taskbar's
+edge (monitor rect minus work area, any side, re-read every 5 s since the taskbar can move or
+auto-hide, scaled to GTK pixels).

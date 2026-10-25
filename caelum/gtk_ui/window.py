@@ -100,6 +100,7 @@ class SkyTracker(Gtk.Window):
         self._cmp_cx  = 62
         self._cmp_cy  = 95
         self._cmp_r   = 46
+        self._insets  = (0, 0, 0, 0)   # screen edges under the Windows taskbar: left, top, right, bottom
         self._moonrise = self._moonset = None
         self._meteors  = []
         self._storm    = wx.Storm()
@@ -296,6 +297,7 @@ class SkyTracker(Gtk.Window):
         self._placed_for   = None    # click_through value the window was placed for
         self._behind_icons = False
         self._tray         = self._make_tray()
+        GLib.timeout_add_seconds(5, self._update_insets)   # the taskbar can move or auto-hide
         # GTK paints at the size it asked for: ask for the whole screen before the first show
         self.set_default_size(*win32.primary_size())
         atexit.register(self._leave_desktop)
@@ -313,6 +315,21 @@ class SkyTracker(Gtk.Window):
         self._behind_icons = behind
         alloc = self.da.get_allocation()
         print(f'Caelum: GTK draws {alloc.width}x{alloc.height}', file=sys.stderr, flush=True)
+        self._update_insets()
+
+    def _update_insets(self):
+        """Keep the gear, compass and forecast off the taskbar: the sky covers the whole screen."""
+        try:
+            edges, screen_w = self._win32.taskbar_edges()
+        except Exception:
+            return True
+        width = self.da.get_allocation().width
+        k = width / screen_w if width > 1 and screen_w else 1.0   # Windows pixels → GTK pixels
+        insets = tuple(int(round(e * k)) for e in edges)
+        if insets != self._insets:
+            self._insets = insets
+            self.da.queue_draw()
+        return True
 
     def _leave_desktop(self):
         """On exit: take the sky off the icon layer so the user's wallpaper shows again."""
@@ -752,7 +769,9 @@ class SkyTracker(Gtk.Window):
         sky_vis  = veil ** 2
 
         # ── Gear button is always drawn first (visible even when app is off)
-        gx, gy = W - 28, H - 28
+        il, it, ir, ib = self._insets
+        gx, gy = W - 28 - ir, H - 28 - ib
+        self._cmp_cx, self._cmp_cy = 62 + il, 95 + it
         self._gear_cx, self._gear_cy = gx, gy
         app_on = cfg.get('app_enabled', True)
 
@@ -850,7 +869,7 @@ class SkyTracker(Gtk.Window):
 
         # ── Compass rose (top-left, toggleable)
         if cfg.get('show_compass', True):
-            self._draw_compass(cr, 62, 95, 46)
+            self._draw_compass(cr, self._cmp_cx, self._cmp_cy, self._cmp_r)
 
         # ── Gear / settings button
         self._draw_gear_btn(cr, gx, gy, 16)
@@ -2055,13 +2074,13 @@ class SkyTracker(Gtk.Window):
         DAY_GAP  = 5
         HOUR_GAP = 2
         MARGIN   = 14
-        x0       = W - CARD_W - MARGIN
+        x0       = W - CARD_W - MARGIN - self._insets[2]
         tz_off   = self.cfg.get('timezone_offset', 0)
         today_str = self._today_str
 
         # Compute max days that fit without overflowing screen height
-        y_start  = 74
-        max_h    = H - y_start - MARGIN
+        y_start  = 74 + self._insets[1]
+        max_h    = H - y_start - MARGIN - self._insets[3]
         n_hourly = len(self._selected_day_slots)
         expanded_h = (DAY_H + DAY_GAP) + n_hourly * (HOUR_H + HOUR_GAP) + DAY_GAP
         remaining  = max_h - expanded_h
