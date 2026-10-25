@@ -891,3 +891,23 @@ thick low cloud: 80% cirrus alone left the sun at ~33% and greyed the sky with t
 - **Settings dialog**: a small dim, selectable "Caelum X.Y.Z" label under the hint at the bottom,
   from `caelum.__version__`. Checked with an off-screen dialog screenshot.
 - Motivation: the user had no easy way to tell which build (local .deb 1.0.1, PPA, snap, flatpak) was running.
+
+### Fresh weather right after suspend/hibernate (unreleased)
+- **Symptom** (user): after waking the PC the sky kept the pre-sleep weather for up to 15 min / 1 h.
+- **Cause**: `GLib.timeout_add` runs on the monotonic clock, which Linux stops during suspend and
+  hibernate, so the 15 min (Open-Meteo) and 1 h (MET Norway) timers resumed where they had paused.
+  Also, a fetch fired while the network was still down returned `None` and nothing retried until the next
+  full interval.
+- **Fix** (`gtk_ui/window.py`): the two weather timers are replaced by `_watch_weather` (every 5 s)
+  with **wall-clock due times** per source (`_due`, `_REFRESH`).
+  - **Resume detection**: when the wall clock advanced >60 s more than the monotonic clock between two
+    checks (`_SLEPT`), `_on_resume` makes both sources due now, drops the astro and cloud caches, and
+    exports the lock-screen/wallpaper image at once. Once the fresh weather lands it exports again
+    (`_export_pending`).
+  - **Failed fetch**: back-off retry 15 s → 30 s → 1 min → 2 min → 5 min (`_RETRY`) instead of waiting a
+    full interval.
+  - **Network back**: `Gio.NetworkMonitor` `network-changed` makes any failing source due immediately.
+- **Verified**: scratch harness with stubbed fetches. Startup fetches both; nothing refetches 5 s later.
+  A simulated 3 h sleep with the network down → both refetched, retry in 15 s, wallpaper exported. Network
+  back → both fetched, next in 900/3600 s, exported again. Live 10 s run fetched real data with no failures.
+  21 tests pass, pyflakes clean.

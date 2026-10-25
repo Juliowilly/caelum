@@ -13,7 +13,7 @@ import urllib.request
 import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('Gdk', '3.0')
-from gi.repository import Gtk, Gdk, GLib
+from gi.repository import Gtk, Gdk, Gio, GLib
 import cairo
 
 from ..core.astronomy import (
@@ -46,6 +46,12 @@ _CLOUD_DRIFT = {'low': 0.020, 'mid': 0.012, 'high': 0.007}
 # Wind at low-cloud base relative to the surface wind
 _LOW_WIND_FACTOR = 1.5
 
+# Weather refresh intervals (s). Kept on the wall clock: GLib timers use the monotonic clock,
+# which stops during suspend/hibernate, so a 1 h timer would still wait ~1 h after resume.
+_REFRESH = {'om': 15 * 60, 'met': 60 * 60}
+_RETRY   = (15, 30, 60, 120, 300)   # back-off after a failed fetch (s)
+_SLEPT   = 60   # wall time the monotonic clock missed beyond this → the system was asleep
+
 class SkyTracker(Gtk.Window):
 
     def __init__(self):
@@ -61,6 +67,10 @@ class SkyTracker(Gtk.Window):
         self._last_met         = None # last MET Norway raw result
         self._om_fetching      = False
         self._met_fetching     = False
+        self._due   = {'om': 0.0, 'met': 0.0}   # wall time each source is next fetched
+        self._fails = {'om': 0, 'met': 0}       # consecutive failed fetches per source
+        self._clock = (time.time(), time.monotonic())
+        self._export_pending = False            # export the wallpaper once fresh weather lands
         self._hover_const  = None
         self._star_screen_cache = {}
         self._mouse_x = self._mouse_y = -1
@@ -95,9 +105,12 @@ class SkyTracker(Gtk.Window):
         self._fetch_weather_async()
         self._fetch_city_name()
         GLib.timeout_add(100,              self._tick)
-        GLib.timeout_add(15 * 60 * 1000,  self._fetch_om_async)
-        GLib.timeout_add(60 * 60 * 1000,  self._fetch_met_async)
+        GLib.timeout_add_seconds(5,        self._watch_weather)
         GLib.timeout_add(5 * 60 * 1000,  self._export_lockscreen_bg)
+        try:
+            Gio.NetworkMonitor.get_default().connect('network-changed', self._on_network_changed)
+        except Exception:
+            pass
         if self._has_compass:
             GLib.timeout_add(500, self._poll_compass)
 
@@ -278,6 +291,52 @@ class SkyTracker(Gtk.Window):
 
     # ── Weather ──────────────────────────────────────────────────────────────
 
+    def _watch_weather(self):
+        """Every 5 s: notice a resume from suspend/hibernate and fetch whatever is due."""
+        wall, mono = time.time(), time.monotonic()
+        slept = (wall - self._clock[0]) - (mono - self._clock[1]) > _SLEPT
+        self._clock = (wall, mono)
+        if slept:
+            self._on_resume()
+        if wall >= self._due['om']:
+            self._fetch_om_async()
+        if wall >= self._due['met']:
+            self._fetch_met_async()
+        return True
+
+    def _on_resume(self):
+        """Back from sleep: refetch everything now and refresh the exported wallpaper."""
+        self._due   = {'om': 0.0, 'met': 0.0}
+        self._fails = {'om': 0, 'met': 0}
+        self._astro_cache = None
+        self._cloud_key   = None
+        self._export_pending = True
+        self._export_lockscreen_bg()   # sun/moon/stars right away; weather follows when fetched
+
+    def _on_network_changed(self, monitor, available):
+        """Network back (typical just after resume): retry failed sources without waiting."""
+        if available:
+            for src in ('om', 'met'):
+                if self._fails[src]:
+                    self._due[src] = 0.0
+
+    def _fetched(self, src, ok):
+        """Schedule the next fetch of a source: normal interval, or back-off after a failure."""
+        if ok:
+            self._fails[src] = 0
+            self._due[src] = time.time() + _REFRESH[src]
+        else:
+            self._due[src] = time.time() + _RETRY[min(self._fails[src], len(_RETRY) - 1)]
+            self._fails[src] += 1
+
+    def _weather_updated(self):
+        merged = merge_weather(self._last_om, self._last_met)
+        if merged is not None:
+            self._apply_clouds(merged)
+            if self._export_pending:
+                self._export_pending = False
+                self._export_lockscreen_bg()
+
     def _fetch_weather_async(self):
         """Fetch both sources at once — used at startup and after location change."""
         self._fetch_om_async()
@@ -285,7 +344,7 @@ class SkyTracker(Gtk.Window):
         return True
 
     def _fetch_om_async(self):
-        """Fetch Open-Meteo (current conditions); called every 15 min."""
+        """Fetch Open-Meteo (current conditions); due every 15 min."""
         if self._om_fetching:
             return True
         self._om_fetching = True
@@ -298,15 +357,14 @@ class SkyTracker(Gtk.Window):
 
     def _apply_om(self, result):
         self._om_fetching = False
+        self._fetched('om', result is not None)
         if result is not None:
             self._last_om = result
-            merged = merge_weather(self._last_om, self._last_met)
-            if merged is not None:
-                self._apply_clouds(merged)
+            self._weather_updated()
         return False
 
     def _fetch_met_async(self):
-        """Fetch MET Norway (forecast + hourly); called every hour."""
+        """Fetch MET Norway (forecast + hourly); due every hour."""
         if self._met_fetching:
             return True
         self._met_fetching = True
@@ -319,11 +377,10 @@ class SkyTracker(Gtk.Window):
 
     def _apply_met(self, result):
         self._met_fetching = False
+        self._fetched('met', result is not None)
         if result is not None:
             self._last_met = result
-            merged = merge_weather(self._last_om, self._last_met)
-            if merged is not None:
-                self._apply_clouds(merged)
+            self._weather_updated()
         return False
 
     def _fetch_city_name(self):
