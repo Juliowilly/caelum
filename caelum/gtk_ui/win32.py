@@ -14,8 +14,11 @@ Only imported on Windows.
 
 import ctypes
 import os
+import queue
 import sys
+import threading
 import winreg
+from concurrent.futures import Future
 from ctypes import wintypes
 
 user32 = ctypes.WinDLL('user32', use_last_error=True)
@@ -273,23 +276,107 @@ class _WNDCLASSEXW(ctypes.Structure):
                 ('hIconSm', wintypes.HICON)]
 
 
+_QS_ALLINPUT, _PM_REMOVE, _INFINITE = 0x04FF, 0x0001, 0xFFFFFFFF
+_kernel32.CreateEventW.restype = wintypes.HANDLE
+_kernel32.CreateEventW.argtypes = [wintypes.LPVOID, wintypes.BOOL, wintypes.BOOL, wintypes.LPCWSTR]
+_kernel32.SetEvent.argtypes = [wintypes.HANDLE]
+_kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+user32.MsgWaitForMultipleObjects.argtypes = [wintypes.DWORD, ctypes.POINTER(wintypes.HANDLE),
+                                             wintypes.BOOL, wintypes.DWORD, wintypes.DWORD]
+user32.PeekMessageW.argtypes = [ctypes.POINTER(wintypes.MSG), wintypes.HWND, wintypes.UINT,
+                                wintypes.UINT, wintypes.UINT]
+user32.TranslateMessage.argtypes = [ctypes.POINTER(wintypes.MSG)]
+user32.DispatchMessageW.argtypes = [ctypes.POINTER(wintypes.MSG)]
+
+
 class DesktopCanvas:
     """
     The sky behind the desktop icons, in plain Win32 windows (GTK can't be reparented). A layered
     host goes into the icon layer, created top-level and then made a child, as live-wallpaper
     apps do on the raised desktop; a child window inside it shows the frames, rendered off screen
     with Cairo, through a Direct3D swap chain (the raised desktop ignores GDI drawing there).
+
+    These windows live on a thread of their own that only pumps their messages and presents the
+    latest frame. A window inside Explorer's desktop ties Explorer's input to the thread that owns
+    it: owned by the main thread, which renders the sky, it froze the whole desktop.
     """
     _CLASS = 'CaelumDesktopSky'
 
     def __init__(self):
+        _x, _y, w, h = _primary_rect()
+        self.size = (w, h)
+        self._frame = None                    # latest (pixels, stride) not yet presented
+        self._lock = threading.Lock()
+        self._calls = queue.Queue()           # (function, Future) to run on the canvas thread
+        self._wake = _kernel32.CreateEventW(None, False, False, None)
+        self._error = False
+        started = Future()
+        threading.Thread(target=self._run, args=(started,), name='caelum-desktop',
+                         daemon=True).start()
+        started.result(timeout=10)            # raises what went wrong on the thread
+
+    # ── Called from the main thread ──
+
+    def place(self):
+        """Behind the icons; False when there is no icon layer to go behind."""
+        return self._call(self._place)
+
+    def show(self, pixels, w, h, stride):
+        """Hand over a frame (Cairo ARGB32 pixels, h rows of `stride` bytes); never waits."""
+        if (w, h) != self.size:
+            return
+        with self._lock:
+            self._frame = (bytes(pixels), stride)
+        _kernel32.SetEvent(self._wake)
+
+    def destroy(self):
+        try:
+            self._call(self._destroy, timeout=5)
+        except Exception as e:
+            print(f'Caelum: desktop canvas: {e}', file=sys.stderr, flush=True)
+
+    def _call(self, fn, timeout=10):
+        done = Future()
+        self._calls.put((fn, done))
+        _kernel32.SetEvent(self._wake)
+        return done.result(timeout=timeout)
+
+    # ── On the canvas thread ──
+
+    def _run(self, started):
+        try:
+            self._create()
+        except Exception as e:
+            started.set_exception(e)
+            return
+        started.set_result(None)
+        msg = wintypes.MSG()
+        handles = (wintypes.HANDLE * 1)(self._wake)
+        while True:
+            user32.MsgWaitForMultipleObjects(1, handles, False, _INFINITE, _QS_ALLINPUT)
+            while user32.PeekMessageW(ctypes.byref(msg), None, 0, 0, _PM_REMOVE):
+                user32.TranslateMessage(ctypes.byref(msg))
+                user32.DispatchMessageW(ctypes.byref(msg))
+            while not self._calls.empty():
+                fn, done = self._calls.get_nowait()
+                try:
+                    done.set_result(fn())
+                except Exception as e:
+                    done.set_exception(e)
+                if fn == self._destroy:
+                    return
+            with self._lock:
+                frame, self._frame = self._frame, None
+            if frame:
+                self._present(*frame)
+
+    def _create(self):
         self._proc = _WNDPROC(self._wndproc)    # keep a reference: Windows calls it
         hinst = _kernel32.GetModuleHandleW(None)
         wc = _WNDCLASSEXW(cbSize=ctypes.sizeof(_WNDCLASSEXW), lpfnWndProc=self._proc,
                           hInstance=hinst, lpszClassName=self._CLASS)
         user32.RegisterClassExW(ctypes.byref(wc))   # fails harmlessly if already registered
         x, y, w, h = _primary_rect()
-        self.size = (w, h)
         self.hwnd = user32.CreateWindowExW(_WS_EX_TOOLWINDOW | _WS_EX_NOACTIVATE | _WS_EX_LAYERED,
                                            self._CLASS, 'Caelum sky', _WS_POPUP,
                                            x, y, w, h, None, None, hinst, None)
@@ -302,10 +389,8 @@ class DesktopCanvas:
         if not self._view:
             raise ctypes.WinError(ctypes.get_last_error())
         self._d3d = _D3DPresenter(self._view, w, h)
-        self._error = False
 
-    def place(self):
-        """Behind the icons; False when there is no icon layer to go behind."""
+    def _place(self):
         layer = _icon_layer()
         if not layer:
             return False
@@ -339,21 +424,19 @@ class DesktopCanvas:
               f'style {style & 0xFFFFFFFF:#010x}, exstyle {ex & 0xFFFFFFFF:#010x}',
               file=sys.stderr, flush=True)
 
-    def show(self, pixels, w, h, stride):
-        """Show a frame: Cairo ARGB32 pixels, h rows of `stride` bytes."""
-        if (w, h) != self.size:
-            return
+    def _present(self, data, stride):
         try:
-            self._d3d.present(bytes(pixels), stride)
+            self._d3d.present(data, stride)
         except OSError as e:
             if not self._error:
                 self._error = True    # once: the log would fill up 10 times a second
                 print(f'Caelum: desktop canvas: {e}', file=sys.stderr, flush=True)
 
-    def destroy(self):
+    def _destroy(self):
         user32.ShowWindow(self.hwnd, _SW_HIDE)
         self._d3d.release()
         user32.DestroyWindow(self.hwnd)
+        _kernel32.CloseHandle(self._wake)
 
     def _wndproc(self, hwnd, msg, wparam, lparam):
         if msg == _WM_ERASEBKGND:

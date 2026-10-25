@@ -1691,3 +1691,13 @@ auto-hide, scaled to GTK pixels).
   mode (the desktop canvas is full-screen, so the monitor's are right there).
 - Next run passed every check in both modes; the compass sits bottom left, below the icon column
   and above the taskbar, and turned east on the click.
+- User test of that build: **after opening Settings the whole desktop froze** (only the pointer
+  moved). A child window inside Explorer's desktop ties Explorer's input to the thread owning it;
+  that was the main thread, which renders the full-screen sky 10 times a second in Python (slower
+  on the user's bigger screen than on the 1024×768 runner). Fixes:
+  - The desktop canvas's windows and Direct3D now live on their own thread, which only pumps
+    their messages and presents the latest frame (MsgWaitForMultipleObjects on a wake event);
+    placement and teardown run there too.
+  - Adaptive frame rate behind the icons: the next frame waits 3× the last render time (at least
+    100 ms), so rendering takes at most a third of the main thread. The log gives ms per frame.
+  - CI: with Settings open, Progman and Shell_TrayWnd must answer a WM_NULL within 2 s.

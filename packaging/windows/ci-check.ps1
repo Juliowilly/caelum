@@ -13,6 +13,9 @@ public static class Desk {
     [DllImport("user32.dll")] static extern void mouse_event(uint f, uint dx, uint dy, uint d, UIntPtr e);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr FindWindow(string c, string t);
     [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
+    [DllImport("user32.dll")] static extern IntPtr SendMessageTimeout(IntPtr h, uint m, IntPtr w, IntPtr l, uint f, uint t, out IntPtr r);
+    // Does this window's thread answer within 2 s? (SMTO_ABORTIFHUNG)
+    public static bool Answers(IntPtr h) { IntPtr r; return SendMessageTimeout(h, 0, IntPtr.Zero, IntPtr.Zero, 2, 2000, out r) != IntPtr.Zero; }
     [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
     public static void Click(int x, int y) {
         SetCursorPos(x, y);
@@ -74,23 +77,28 @@ foreach ($mode in 'behind-icons', 'click-through-off') {
     Start-Sleep -Seconds 2
     $facing = (Get-Content "$cfgDir\config.json" | ConvertFrom-Json).facing
     if ([math]::Abs($facing - 90) -gt 1) { $failed += "${mode}: compass click (facing $facing)" }
-    Shot "$mode-compass"
+    $null = Shot "$mode-compass"
 
     # Gear (28 px in from the work area's bottom-right corner) opens Settings
     [Desk]::Click($work.Right - 28, $work.Bottom - 28)
     Start-Sleep -Seconds 4
-    Shot "$mode-gear"
+    $null = Shot "$mode-gear"
     $dlg = [Desk]::FindWindow([NullString]::Value, $settingsTitle)   # $null would pass ""
     if ($dlg -eq [IntPtr]::Zero) {
         $failed += "${mode}: gear click opened no Settings"
     } else {
-        Shot "$mode-settings"
+        $null = Shot "$mode-settings"
         # Second tab (Display): the four tabs are centred under the title bar
         $r = New-Object Desk+RECT
         [Desk]::GetWindowRect($dlg, [ref]$r) | Out-Null
         [Desk]::Click([int](($r.Left + $r.Right) / 2 - 45), $r.Top + 55)
         Start-Sleep -Seconds 2
-        Shot "$mode-settings-tab"
+        $null = Shot "$mode-settings-tab"
+        # With Settings open, Explorer's desktop and taskbar must still answer (they froze once)
+        foreach ($cls in 'Progman', 'Shell_TrayWnd') {
+            $w = [Desk]::FindWindow($cls, [NullString]::Value)
+            if (-not [Desk]::Answers($w)) { $failed += "${mode}: $cls stopped answering with Settings open" }
+        }
     }
 
     $log = "$env:LOCALAPPDATA\caelum\caelum.log"

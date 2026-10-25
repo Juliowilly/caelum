@@ -306,6 +306,8 @@ class SkyTracker(Gtk.Window):
         self._hit          = self._make_hit_layer()
         GLib.timeout_add_seconds(5, self._update_insets)   # the taskbar can move or auto-hide
         self._frames = 0
+        self._render_s  = 0.0    # time spent rendering for the desktop canvas
+        self._next_push = 0.0    # monotonic time the next desktop frame is due
         GLib.timeout_add_seconds(10, self._log_frames)
         # GTK paints at the size it asked for: ask for the whole screen before the first show
         self.set_default_size(*win32.primary_size())
@@ -351,7 +353,10 @@ class SkyTracker(Gtk.Window):
             self._push_desktop_frame()
 
     def _push_desktop_frame(self):
-        """Render one frame off screen and show it behind the icons."""
+        """Render one frame off screen and show it behind the icons. A frame that takes long to
+        render (a big screen, a slow PC) spaces out the next ones, so rendering never takes more
+        than a third of the main thread's time: Settings and the clicks stay responsive."""
+        t0 = time.monotonic()
         W, H = self._canvas.size
         surf = cairo.ImageSurface(cairo.FORMAT_ARGB32, W, H)
         self._canvas_size = (W, H)
@@ -361,6 +366,9 @@ class SkyTracker(Gtk.Window):
             self._canvas_size = None
         surf.flush()
         self._canvas.show(surf.get_data(), W, H, surf.get_stride())
+        took = time.monotonic() - t0
+        self._render_s += took
+        self._next_push = t0 + max(0.1, 3 * took)
 
     def _update_insets(self):
         """Keep the gear, compass and forecast off the taskbar: the sky covers the whole screen."""
@@ -391,8 +399,9 @@ class SkyTracker(Gtk.Window):
 
     def _log_frames(self):
         """For bug reports: whether the sky still repaints (it should, ~10 frames a second)."""
-        print(f'Caelum: {self._frames} frames drawn in 10 s', file=sys.stderr, flush=True)
-        self._frames = 0
+        avg = f', {1000 * self._render_s / self._frames:.0f} ms each' if self._render_s else ''
+        print(f'Caelum: {self._frames} frames drawn in 10 s{avg}', file=sys.stderr, flush=True)
+        self._frames, self._render_s = 0, 0.0
         return True
 
     def _make_hit_layer(self):
@@ -462,7 +471,8 @@ class SkyTracker(Gtk.Window):
         if datetime.date.today() != self._last_date:
             self._refresh_day()
         if self._win32 and self._behind_icons:
-            self._push_desktop_frame()
+            if time.monotonic() >= self._next_push:
+                self._push_desktop_frame()
         else:
             self.da.queue_draw()
         return True
