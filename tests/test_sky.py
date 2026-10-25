@@ -2,6 +2,7 @@ import unittest
 
 from caelum.core.astronomy import phase_index
 from caelum.core.sky import (
+    low_clouds, plane_to_sky,
     band_slots, cloud_layers, mid_sheet, naked_eye_visibility, opaque_cover, overcast_deck, set_facing, sky_to_screen, veil_transmission,
 )
 
@@ -73,6 +74,33 @@ class CloudOpticsTest(unittest.TestCase):
     def test_cover_change_keeps_existing_clouds_in_place(self):
         less = set(band_slots('low', 30, 4.0, 0.14))
         more = set(band_slots('low', 60, 4.0, 0.14))
+        self.assertTrue(less <= more)
+
+
+class LowCloudLayerTest(unittest.TestCase):
+    def test_projection(self):
+        el, az = plane_to_sky(0.0, 1.5, 1.5)          # 1.5 km north, 1.5 km up
+        self.assertAlmostEqual(el, 45.0)
+        self.assertAlmostEqual(az, 0.0)
+        self.assertAlmostEqual(plane_to_sky(3.0, 0.0, 1.5)[1], 90.0)   # east
+
+    def test_sight_lines_blocked_as_often_as_the_cover(self):
+        import random
+        rng = random.Random(7)
+        for cov in (20, 50, 80):
+            hits = n = 0
+            for k in range(6):                         # several wind positions
+                field = low_clouds(cov, (k * 7.3, k * -4.1), max_km=8.0)
+                for _ in range(400):
+                    px, py = rng.uniform(-5, 5), rng.uniform(-5, 5)
+                    hits += any((x - px) ** 2 + (y - py) ** 2 < (s / 2) ** 2
+                                for x, y, s, _t, _i in field)
+                    n += 1
+            self.assertAlmostEqual(hits / n, cov / 100, delta=0.06, msg=f'{cov}%')
+
+    def test_more_cover_keeps_existing_clouds(self):
+        less = {c[4] for c in low_clouds(30, (0.0, 0.0))}
+        more = {c[4] for c in low_clouds(60, (0.0, 0.0))}
         self.assertTrue(less <= more)
 
 

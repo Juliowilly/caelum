@@ -131,6 +131,53 @@ def veil_transmission(clouds):
     t *= 1.0 - 0.85 * _clamp((low - 70) / 30.0, 0.0, 1.0)    # stratus / stratocumulus deck
     return t
 
+# ─── Low cloud layer: real clouds on a flat layer, seen in perspective ───────
+# Cumulus sit on a plane LOW_BASE_KM up. Positions are in km east (x) / north (y) of the
+# observer, on a tile that repeats every LOW_TILE_KM and moves with the wind. Overhead clouds
+# look big and move fast; distant ones shrink and crowd toward the horizon, and any line of
+# sight is blocked with a chance equal to the cover.
+LOW_BASE_KM = 1.5
+LOW_TILE_KM = 50.0
+LOW_NEAR_KM = 12.0   # drawn one by one up to here; beyond, a distant cloud bank
+
+_low_pool = []
+
+def _low_pool_upto(n):
+    while len(_low_pool) < n:
+        rng = random.Random(f'lowc:{len(_low_pool)}')
+        half = LOW_TILE_KM / 2
+        size = min(0.6 + rng.expovariate(1 / 0.9), 4.0)       # diameter, km
+        _low_pool.append((rng.uniform(-half, half), rng.uniform(-half, half),
+                          size, size * rng.uniform(0.45, 0.80)))  # thickness, km
+    return _low_pool
+
+# Mean footprint (km²) of the size distribution above
+_LOW_MEAN_AREA = sum(math.pi * c[2] ** 2 / 4 for c in _low_pool_upto(4000)) / 4000
+
+def low_cloud_count(cover):
+    """Clouds on the tile so their (overlapping) footprints cover `cover` % of the layer."""
+    f = _clamp(cover / 100.0, 0.0, 0.97)
+    return int(-math.log(1.0 - f) * LOW_TILE_KM ** 2 / _LOW_MEAN_AREA)
+
+def low_clouds(cover, offset, max_km=LOW_NEAR_KM):
+    """[(x, y, size, thickness, index)] within max_km of the observer, nearest last."""
+    ox, oy = offset
+    half, tile = LOW_TILE_KM / 2, LOW_TILE_KM
+    out = []
+    n = low_cloud_count(cover)
+    for i, (x0, y0, size, thick) in enumerate(_low_pool_upto(n)[:n]):
+        x = (x0 + ox + half) % tile - half
+        y = (y0 + oy + half) % tile - half
+        if x * x + y * y <= max_km * max_km:
+            out.append((x, y, size, thick, i))
+    out.sort(key=lambda c: -(c[0] ** 2 + c[1] ** 2))      # far to near, for painting
+    return out
+
+def plane_to_sky(x, y, h):
+    """(elevation°, azimuth°) of a point x km east, y km north, h km up."""
+    return (math.degrees(math.atan2(h, math.hypot(x, y))),
+            math.degrees(math.atan2(x, y)) % 360.0)
+
 def band_slots(layer, cover, strip, pitch):
     """
     Clouds of the band that drifts past the sun/moon: fixed slots every `pitch` along a

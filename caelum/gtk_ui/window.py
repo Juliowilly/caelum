@@ -43,6 +43,8 @@ from .settings import SettingsDialog
 
 # Cloud drift across the view: degrees per second per m/s of surface wind
 _CLOUD_DRIFT = {'low': 0.020, 'mid': 0.012, 'high': 0.007}
+# Wind at low-cloud base relative to the surface wind
+_LOW_WIND_FACTOR = 1.5
 
 class SkyTracker(Gtk.Window):
 
@@ -79,7 +81,10 @@ class SkyTracker(Gtk.Window):
         # Cloud layers' scroll offsets (screen widths); start where the wind left them
         self._drift   = {layer: time.time() / 600.0 * 0.618 % 4.0 for layer in _CLOUD_DRIFT}
         self._drift_t = time.monotonic()
+        # Low cumulus layer position (km east, km north); start somewhere new each run
+        self._low_offset = [time.time() * 0.0137 % 50.0, time.time() * 0.0091 % 50.0]
         self._cloud_surf = self._cloud_key = None   # cached cloud layer (see _draw_clouds)
+        self._cloud_t    = 0.0
         self._hw_heading   = None   # live heading from hardware sensor (degrees)
         self._has_compass  = False
         self._compass_dev  = None   # IIO sysfs device path
@@ -1097,28 +1102,46 @@ class SkyTracker(Gtk.Window):
         for layer, deg_per_ms in _CLOUD_DRIFT.items():
             # degrees/s → screen widths/s (the panorama spans 240°)
             self._drift[layer] += side * wind_spd * deg_per_ms / 240.0 * dt
+        # Low cumulus layer: carried bodily by the wind (km), stronger at cloud base than at
+        # the ground; perspective then turns this into on-screen motion
+        km = _LOW_WIND_FACTOR * wind_spd / 1000.0 * dt
+        self._low_offset[0] += km * math.sin(math.radians(wind_to))
+        self._low_offset[1] += km * math.cos(math.radians(wind_to))
 
     def _draw_clouds(self, cr, W, H, clouds, sun_el, body=None):
         """
-        Clouds move about a pixel a second, so the layer is rendered into a cached surface
-        and only redrawn when it would visibly change (drift, weather, sun/moon position).
+        Clouds move a pixel or two a second, so the layer is rendered into a cached surface at
+        half resolution (soft shapes: the upscale doesn't show, and it is 4× less to fill).
+        It is redrawn at once when the scene changes (size, weather, view, sun/moon), and
+        for drift at most once a second.
         """
         self._advance_cloud_drift(clouds)
-        # Drift snapped to whole pixels, so the cached image matches what would be drawn
-        drift = {k: round(v * W) / W for k, v in self._drift.items()}
-        key = (W, H, id(clouds), clouds.get('ts'), tuple(drift.values()), round(sun_el * 4),
-               tuple(round(v) for v in body) if body else None)
-        if key != self._cloud_key:
-            surf = cr.get_target().create_similar(cairo.Content.COLOR_ALPHA, W, H)
-            self._render_clouds(cairo.Context(surf), W, H, clouds, sun_el, body, drift)
-            self._cloud_surf, self._cloud_key = surf, key
+        # Drift snapped to half-res pixels, so the cached image matches what would be drawn
+        drift  = {k: round(v * W / 2) * 2 / W for k, v in self._drift.items()}
+        # Low layer snapped to 8 m steps: about one half-res pixel for a cloud overhead
+        offset = tuple(round(v / 0.008) * 0.008 for v in self._low_offset)
+        scene  = (W, H, id(clouds), clouds.get('ts'), round(get_facing(), 1), round(sun_el * 4),
+                  tuple(round(v) for v in body) if body else None)
+        motion = (tuple(drift.values()), offset)
+        now    = time.monotonic()
+        if self._cloud_key is None or scene != self._cloud_key[0] or (
+                motion != self._cloud_key[1] and now - self._cloud_t >= 1.0):
+            surf = cr.get_target().create_similar(cairo.Content.COLOR_ALPHA, W // 2, H // 2)
+            ctx  = cairo.Context(surf)
+            ctx.scale(0.5, 0.5)
+            self._render_clouds(ctx, W, H, clouds, sun_el, body, drift, offset)
+            self._cloud_surf, self._cloud_key, self._cloud_t = surf, (scene, motion), now
+        cr.save()
+        cr.scale(2.0, 2.0)
         cr.set_source_surface(self._cloud_surf, 0, 0)
+        cr.get_source().set_filter(cairo.Filter.BILINEAR)
         cr.paint()
+        cr.restore()
 
     @staticmethod
     def _draw_faded(cr, alpha, draw, *args, **kwargs):
         """Run a cloud draw function at reduced overall opacity (skipped when invisible)."""
-        if alpha <= 0.0:
+        if alpha < 0.02:
             return
         if alpha < 1.0:
             cr.push_group()
@@ -1127,15 +1150,15 @@ class SkyTracker(Gtk.Window):
             cr.pop_group_to_source()
             cr.paint_with_alpha(alpha)
 
-    def _render_clouds(self, cr, W, H, clouds, sun_el, body, drift):
+    def _render_clouds(self, cr, W, H, clouds, sun_el, body, drift, offset):
         top_col, dark_col, cir_col = _cloud_palette(sun_el)
 
         low_cov, mid_cov, high_cov = cloud_layers(clouds)
         wmo = clouds.get('wmo', 0)
 
-        # Back-to-front: cirrus → altocumulus → overcast deck → cumulus. A band of clouds
-        # drifts past the sun/moon, hiding it for the share of time given by the cover; the
-        # rest of the time it is clear: broken cloud doesn't dim the whole sky.
+        # Back-to-front: cirrus → altocumulus → overcast deck → cumulus. Broken cloud doesn't
+        # dim the whole sky: the sun/moon is hidden only while a cloud is in front of it — low
+        # cumulus by perspective geometry, altocumulus by a band drifting past the body.
         pos  = body[:2] if body else None
         deck = overcast_deck(clouds)
         sheet = mid_sheet(clouds)
@@ -1149,7 +1172,7 @@ class SkyTracker(Gtk.Window):
         # from under a ceiling) fade into it as it closes
         draw_deck(cr, W, H, deck, top_col, dark_col, drift=drift['low'])
         self._draw_faded(cr, 1.0 - deck ** 2, draw_cumulus,
-                         W, H, low_cov, top_col, dark_col, wmo=wmo, drift=drift['low'], body=body)
+                         W, H, low_cov, top_col, dark_col, wmo=wmo, offset=offset)
 
         # Celestial body glow: illuminates clouds around sun/moon position
         if pos:

@@ -820,3 +820,42 @@ thick low cloud: 80% cirrus alone left the sun at ~33% and greyed the sky with t
   (−4.0) first, then Jupiter (≈ −2° sun), Mars (≈ −4°), Mercury/Saturn (≈ −6°…−7°).
 - Verified: clear-sky renders 12:00 → 18:45 UTC facing the sunset: no planets at noon or sunset,
   Mercury fades in at −6.3°, stars follow. 2 new tests (none in daylight, twilight order); 18 pass.
+
+### Low clouds in perspective across the whole sky (replaces near-horizon cumulus + low band)
+- Before: general cumulus were drawn only 0.54–0.70 H (2°–25° up), so at high cover the middle of
+  the sky was empty except the band of clouds drifting past the sun.
+- **Model** (`core.sky`): cumulus are objects on a flat layer `LOW_BASE_KM` = 1.5 km up, positions in
+  km east/north on a `LOW_TILE_KM` = 50 km tile that wraps. Sizes 0.6 km + exp(mean 0.9) (≤ 4 km),
+  thickness 45–80 % of the size; pool seeded per cloud and grown lazily. `low_cloud_count(cover)` =
+  −ln(1 − cover)·tile² / mean footprint, so overlapping footprints cover exactly `cover` of the layer
+  (tested: random sight lines blocked 20/50/80 % ± 6). More cover only adds clouds (tested).
+  `plane_to_sky(x, y, h)` gives elevation/azimuth.
+- **Drawing** (`clouds.draw_cumulus`): clouds within `LOW_NEAR_KM` = 12 km, far to near, projected:
+  width from azimuth span (size / horizontal distance), height from the near/far edge of the base and
+  the tower top; the cumulus shape is fitted inside that extent. Beyond 12 km (< 7° up)
+  `_distant_bank`: soft flat lumps fixed to azimuths, filled `1 − (1 − cover)^4` (perspective packs
+  distant clouds together). Specks < 1.2 % W are left to the bank.
+- **Look**: `side` (from mean elevation, 12° → 42°) blends a side view (flat dark base, sunlit
+  white cauliflower, highlight) into a view from below (grey shaded underside, no base line or sunlit
+  top). Puffs get a fixed-width edge (`_soft_puff(edge=1.2 % W)`) so big clouds stay crisp; big clouds
+  get up to 3× more, smaller puffs; distant ones are one compact lump and fade into haze (−55 % at
+  12 km). Each cloud is composited as one shape (push_group clipped to its box, then
+  `paint_with_alpha`), so overlapping puffs don't show as translucent lobes. Cumulus opacity
+  0.78–0.95 (was 0.48–0.90).
+- **Motion**: the layer is carried bodily by the wind (`_low_offset` km, wind at cloud base =
+  1.5 × surface, `_LOW_WIND_FACTOR`), so overhead clouds move fast, distant ones slowly, and clouds
+  approach or recede when the wind blows along the view. The sun/moon is now hidden by geometry alone;
+  the low band (`_LOW_PITCH`) is gone (the mid-level band stays).
+- **Performance**: cloud cache now rendered at **half resolution** and upscaled (bilinear); the deck
+  texture is built at that device scale. Redrawn at once on scene changes (size, weather, facing —
+  now in the key since clouds are fixed to azimuths —, sun/moon), and for motion at most once per
+  second (drift snapped to half-res px, low offset to 8 m). `_draw_faded` skips layers under 2 %
+  (95 % cover was drawing ~380 invisible cumulus). 1920×1080 full cloud redraw: 46 / 61 / 126 / 194
+  / 42 ms at 10 / 30 / 60 / 80 / 95 % low cover; cached frames 22–30 ms.
+
+### Verified (perspective clouds)
+- Full-res renders at 10–95 %: overhead grey-bottomed clouds, white side-lit cumulus toward the
+  horizon, a distant bank on it; 30 % leaves the upper sky mostly clear; 80 % blends into the
+  forming deck; overcast/altostratus/sunset/night unchanged.
+- Time-lapse 60 %, 3-min steps: sun clear in 4 of 9 frames; night 60 %: clouds cross the moon.
+- 21 tests pass; pyflakes clean.

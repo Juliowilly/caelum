@@ -6,7 +6,9 @@ import random
 
 import cairo
 
-from ..core.sky import _clamp, band_slots
+from ..core.sky import (
+    LOW_BASE_KM, LOW_NEAR_KM, _clamp, band_slots, get_facing, low_clouds, plane_to_sky,
+)
 
 # ─── Cloud field ─────────────────────────────────────────────────────────────
 # Each layer is a fixed pool of clouds spread along a strip STRIP screens wide that wraps
@@ -14,8 +16,7 @@ from ..core.sky import _clamp, band_slots
 # the pool are shown, so a weather update adds or removes clouds instead of reshuffling.
 
 STRIP = 4.0
-_LOW_PITCH = 0.14   # band slot spacing (screen widths) ≈ width over which a cumulus hides the sun
-_MID_PITCH = 0.08
+_MID_PITCH = 0.08   # band slot spacing (screen widths) ≈ width of an altocumulus patch
 
 @functools.lru_cache(maxsize=32)
 def _pool(layer, n):
@@ -48,19 +49,30 @@ def _visible(pool, drift, W, margin):
 
 # ─── Cloud rendering ─────────────────────────────────────────────────────────
 
-def _soft_puff(cr, cx, cy, rx, ry, r, g, b, alpha):
-    """Soft elliptical cloud puff with natural liquid-water-content density profile."""
+def _soft_puff(cr, cx, cy, rx, ry, r, g, b, alpha, edge=None):
+    """
+    Soft elliptical cloud puff with natural liquid-water-content density profile.
+    edge: width (px) of the fading rim, so big puffs keep a crisp outline; default is
+    proportional to the size (soft).
+    """
     if rx <= 0 or ry <= 0 or alpha <= 0:
         return
     cr.save()
     cr.translate(cx, cy)
     cr.scale(rx, ry)
     pat = cairo.RadialGradient(0, 0, 0, 0, 0, 1)
-    pat.add_color_stop_rgba(0.00, r, g, b, alpha)
-    pat.add_color_stop_rgba(0.28, r, g, b, alpha * 0.92)  # dense core
-    pat.add_color_stop_rgba(0.58, r, g, b, alpha * 0.50)
-    pat.add_color_stop_rgba(0.82, r, g, b, alpha * 0.12)  # sharp edge falloff
-    pat.add_color_stop_rgba(1.00, r, g, b, 0.0)
+    if edge is not None and edge < 0.6 * max(rx, ry):
+        e = max(edge / max(rx, ry), 0.12)
+        pat.add_color_stop_rgba(0.00,        r, g, b, alpha)
+        pat.add_color_stop_rgba(1.0 - e,     r, g, b, alpha * 0.90)
+        pat.add_color_stop_rgba(1.0 - e / 2, r, g, b, alpha * 0.40)
+        pat.add_color_stop_rgba(1.00,        r, g, b, 0.0)
+    else:
+        pat.add_color_stop_rgba(0.00, r, g, b, alpha)
+        pat.add_color_stop_rgba(0.28, r, g, b, alpha * 0.92)  # dense core
+        pat.add_color_stop_rgba(0.58, r, g, b, alpha * 0.50)
+        pat.add_color_stop_rgba(0.82, r, g, b, alpha * 0.12)  # sharp edge falloff
+        pat.add_color_stop_rgba(1.00, r, g, b, 0.0)
     cr.arc(0, 0, 1, 0, 2 * math.pi)
     cr.set_source(pat)
     cr.fill()
@@ -143,16 +155,24 @@ def draw_deck(cr, W, H, deck, top_col, dark_col, drift=0.0):
     cr.set_source(grad)
     cr.fill()
 
-    # Cells: thick parts darker, thinner edges paler
-    key = (W, H, round(deck, 2), tuple(round(v, 2) for v in rgb))
+    # Cells: thick parts darker, thinner edges paler. The texture is made at the target's
+    # device scale (the cloud layer renders at half size), so it is copied pixel for pixel.
+    sx  = cr.get_matrix().xx
+    key = (W, H, sx, round(deck, 2), tuple(round(v, 2) for v in rgb))
     if key != _deck_tex['key']:
-        surf = cr.get_target().create_similar(cairo.Content.COLOR_ALPHA, W, int(y_hor) + 1)
-        _deck_cells(cairo.Context(surf), W, H, deck, rgb)
+        surf = cr.get_target().create_similar(cairo.Content.COLOR_ALPHA,
+                                              int(W * sx), int(y_hor * sx) + 1)
+        tex = cairo.Context(surf)
+        tex.scale(sx, sx)
+        _deck_cells(tex, W, H, deck, rgb)
         _deck_tex.update(key=key, surf=surf)
     shift = (drift * W) % W
+    cr.save()
+    cr.scale(1 / sx, 1 / sx)
     for x in (-shift, W - shift):
-        cr.set_source_surface(_deck_tex['surf'], x, 0)
+        cr.set_source_surface(_deck_tex['surf'], round(x * sx), 0)
         cr.paint()
+    cr.restore()
 
 def draw_cirrus(cr, W, H, coverage, col, drift=0.0):
     """High-altitude ice clouds: thin wispy streaks with fade envelope and parallel fibers."""
@@ -237,52 +257,75 @@ def draw_altocumulus(cr, W, H, coverage, col, drift=0.0, body=None):
                                    rng.uniform(0.030, 0.050) * W, rng.uniform(0.016, 0.028) * H,
                                    a_base * fade * rng.uniform(0.85, 1.00), col, shade, rng)
 
-def _cumulus_cloud(cr, W, H, cx, base_y, cw, ch, a_base, top_col, dark_col, rng, anvil=False):
-    rt, gt, bt = top_col
+def _cumulus_cloud(cr, W, H, cx, base_y, cw, ch, a_base, top_col, dark_col, rng, anvil=False,
+                   side=1.0):
+    """
+    side: 1 = seen from the side (near the horizon: flat dark base, sunlit cauliflower top),
+    0 = seen from below (overhead: shaded grey underside, no base line or sunlit top).
+    """
     rd, gd, bd = dark_col
+    # Body colour: sunlit white from the side, grey underside from below
+    under = tuple(0.62 * d + 0.38 * t for t, d in zip(top_col, dark_col))
+    rt, gt, bt = (side * t + (1 - side) * u for t, u in zip(top_col, under))
+    # Small (distant) clouds get fewer puffs: the detail wouldn't show
+    detail = _clamp(cw / (0.10 * W), 0.25, 3.0)
+    shrink = 1.0 / math.sqrt(max(detail, 1.0))   # many smaller puffs on big clouds
+    edge   = 0.012 * W                            # crisp outline, whatever the size
+    spread = 0.80 if detail >= 0.4 else 0.45      # small clouds: one compact lump
 
     # 1. Ground shadow — faint dark ellipse on terrain for large nearby clouds
-    if base_y > 0.60 * H:
+    if base_y > 0.60 * H and cw > 0.10 * W:
         _soft_puff(cr, cx, H * 0.73,
                    cw * 0.50, H * 0.010,
                    rd * 0.45, gd * 0.45, bd * 0.50,
                    a_base * 0.20)
 
-    # 2. Flat dark base — wide, horizontally compressed (the cloud's LCL line)
-    _soft_puff(cr, cx, base_y, cw * 1.08, ch * 0.16,
-               rd, gd, bd, a_base * 0.90)
-    _soft_puff(cr, cx, base_y - ch * 0.05, cw * 0.95, ch * 0.09,
-               rd, gd, bd, a_base * 0.55)   # sharp inner edge
+    # The cloud is built at full strength in its own group and laid down once at a_base,
+    # so overlapping puffs read as one solid shape instead of stacked translucent lobes
+    a_cloud, a_base = a_base, 1.0
+    cr.save()
+    cr.rectangle(cx - cw * 1.7, base_y - ch * 2.2, cw * 3.4, ch * 3.4)
+    cr.clip()
+    cr.push_group()
+
+    # 2. Flat dark base — wide, horizontally compressed (the cloud's LCL line), side view only
+    if side > 0.05:
+        a_flat = a_base * side * min(1.0, detail * 2.0)   # faint on small, distant clouds
+        _soft_puff(cr, cx, base_y, cw * 1.08, ch * 0.16,
+                   rd, gd, bd, a_flat * 0.90)
+        _soft_puff(cr, cx, base_y - ch * 0.05, cw * 0.95, ch * 0.09,
+                   rd, gd, bd, a_flat * 0.55)   # sharp inner edge
 
     # 3. Main body — several overlapping puffs rising from the base
-    n_body = rng.randint(4, 7)
+    n_body = max(3, round(rng.randint(4, 7) * detail))
     for j in range(n_body):
-        ox  = (j / max(1, n_body - 1) - 0.5) * cw * 0.80
-        dim = 1.0 - abs(ox / (cw * 0.5)) * 0.14   # edge puffs slightly darker
+        ox  = (j / max(1, n_body - 1) - 0.5) * cw * spread
+        dim = 1.0 - abs(ox / (cw * 0.5)) * 0.14 * side   # side view: edge puffs darker
         _soft_puff(cr,
                    cx + ox, base_y + rng.uniform(-ch * 0.18, ch * 0.06),
-                   cw * rng.uniform(0.28, 0.54),
+                   cw * rng.uniform(0.28, 0.54) * shrink,
                    ch * rng.uniform(0.55, 0.92),
                    rt * dim, gt * dim, bt * dim,
-                   a_base * rng.uniform(0.80, 1.00))
-
+                   a_base * rng.uniform(0.80, 1.00), edge)
     # 4. Cauliflower second tier — smaller puffs on top
-    n_top = rng.randint(2, 5)
+    # Distant clouds: a small flat lump is all that shows
+    n_top = max(1, round(rng.randint(2, 5) * detail)) if detail >= 0.4 else 0
     for j in range(n_top):
         ox = (j / max(1, n_top - 1) - 0.5) * cw * 0.55
         _soft_puff(cr,
                    cx + ox, base_y - ch * rng.uniform(0.38, 0.72),
-                   cw * rng.uniform(0.18, 0.36),
+                   cw * rng.uniform(0.18, 0.36) * shrink,
                    ch * rng.uniform(0.30, 0.55),
-                   rt, gt, bt, a_base * rng.uniform(0.65, 0.90))
+                   rt, gt, bt, a_base * rng.uniform(0.65, 0.90), edge)
 
-    # 5. Bright sunlit specular highlight at the very top
-    _soft_puff(cr,
-               cx + rng.uniform(-cw * 0.10, cw * 0.10),
-               base_y - ch * rng.uniform(0.62, 0.90),
-               cw * 0.20, ch * 0.26,
-               min(1.0, rt + 0.07), min(1.0, gt + 0.05), min(1.0, bt + 0.02),
-               a_base * 0.60)
+    # 5. Bright sunlit specular highlight at the very top (side view)
+    if side > 0.05 and detail >= 0.4:
+        _soft_puff(cr,
+                   cx + rng.uniform(-cw * 0.10, cw * 0.10),
+                   base_y - ch * rng.uniform(0.62, 0.90),
+                   cw * 0.20 * shrink, ch * 0.26,
+                   min(1.0, top_col[0] + 0.07), min(1.0, top_col[1] + 0.05),
+                   min(1.0, top_col[2] + 0.02), a_base * 0.60 * side)
 
     # 6. Cumulonimbus anvil — flat spreading top for thunderstorm clouds
     if anvil:
@@ -292,37 +335,75 @@ def _cumulus_cloud(cr, W, H, cx, base_y, cw, ch, a_base, top_col, dark_col, rng,
         _soft_puff(cr, cx, anvil_y - ch * 0.06, cw * 1.35, ch * 0.10,
                    rd * 0.65, gd * 0.65, bd * 0.72, a_base * 0.45)
 
-def draw_cumulus(cr, W, H, coverage, top_col, dark_col, wmo=0, drift=0.0, body=None):
+    cr.pop_group_to_source()
+    cr.paint_with_alpha(a_cloud)
+    cr.restore()
+
+def _distant_bank(cr, W, H, coverage, top_col, dark_col, a_base, px_deg, py_deg):
     """
-    Low cumulus: crisp flat base, cauliflower puff tower, specular highlight,
-    ground shadow. Cumulonimbus anvil for thunderstorm WMO codes (≥95).
-    body=(x, y, r): the sun/moon, which the drifting band of clouds passes over.
+    Clouds beyond LOW_NEAR_KM: within a few degrees of the horizon, where perspective packs
+    them together, so even scattered cloud shows as a nearly continuous low bank.
+    Fixed to azimuths, so it turns with the view.
+    """
+    el_max = math.degrees(math.atan2(LOW_BASE_KM, LOW_NEAR_KM))
+    sat    = 1.0 - (1.0 - coverage / 100.0) ** 4     # share of the bank that is cloud
+    col    = tuple(0.80 * t + 0.20 * d for t, d in zip(top_col, dark_col))
+    facing = get_facing()
+    for k in range(72):
+        rng = random.Random(f'bank:{k}')
+        if rng.random() > sat:
+            continue
+        rel = ((k * 5.0 + rng.uniform(0, 5.0) - facing + 180.0) % 360.0) - 180.0
+        if abs(rel) > 130.0:
+            continue
+        cx = W * 0.06 + (rel + 120.0) * px_deg
+        el = rng.uniform(0.8, el_max * 0.8)
+        cy = H * 0.72 - el * py_deg
+        cw = rng.uniform(5.0, 10.0) * px_deg
+        ch = rng.uniform(1.0, 2.0) * py_deg
+        a  = a_base * rng.uniform(0.45, 0.85) * (0.6 + 0.4 * el / el_max)   # haze near 0°
+        _soft_puff(cr, cx, cy, cw, ch, *col, a)
+        _soft_puff(cr, cx, cy + ch * 0.45, cw * 1.05, ch * 0.30, *dark_col, a * 0.6)
+
+def draw_cumulus(cr, W, H, coverage, top_col, dark_col, wmo=0, offset=(0.0, 0.0)):
+    """
+    Low cumulus on a flat layer LOW_BASE_KM up, drawn in perspective: crisp flat base,
+    cauliflower puff tower, specular highlight. Cumulonimbus anvil for thunderstorm WMO
+    codes (≥95). offset (km east, km north) is how far the wind has carried the layer.
     """
     if coverage < 5:
         return
     is_cb  = wmo >= 95
-    n      = int((coverage / 100.0 * 8 + 1) * STRIP)
-    a_base = 0.48 + 0.42 * (coverage / 100.0)
+    a_base = 0.78 + 0.17 * (coverage / 100.0)   # cumulus are nearly opaque
+    px_deg = W * 0.88 / 240.0          # panorama scale (see sky_to_screen)
+    py_deg = H * 0.66 / 90.0
+    facing = get_facing()
+    h      = LOW_BASE_KM
 
-    for i, (cx, rng) in enumerate(_visible(_pool('low', n), drift, W, 0.4 * W)):
-        # Cloud base sits near the horizon (LCL level)
-        base_y = rng.uniform(0.54, 0.70) * H
-        big    = is_cb and i % 5 == 0
-        if big:
-            cw = rng.uniform(0.18, 0.34) * W
-            ch = rng.uniform(0.20, 0.34) * H
-        else:
-            cw = rng.uniform(0.07, 0.21) * W
-            ch = rng.uniform(0.06, 0.13) * H
-        _cumulus_cloud(cr, W, H, cx, base_y, cw, ch, a_base, top_col, dark_col, rng,
-                       anvil=big)
+    _distant_bank(cr, W, H, coverage, top_col, dark_col, a_base, px_deg, py_deg)
 
-    if body:
-        # One cloud per slot, its dense lower body at the body's height
-        for cx, fade, rng in _band('low', coverage, _LOW_PITCH, drift, W, body, 1.5):
-            cw = rng.uniform(0.14, 0.18) * W
-            ch = rng.uniform(0.09, 0.13) * H
-            if body[1] + ch * 0.20 > 0.70 * H:
-                continue   # body at the horizon: the general clouds cover it
-            _cumulus_cloud(cr, W, H, cx, body[1] + ch * 0.20, cw, ch,
-                           max(a_base, 0.95) * fade, top_col, dark_col, rng)
+    for x, y, size, thick, i in low_clouds(coverage, offset):
+        d       = math.hypot(x, y)
+        _el, az = plane_to_sky(x, y, h)
+        rel     = ((az - facing + 180.0) % 360.0) - 180.0
+        half_w  = math.degrees(min(size / 2 / max(d, 0.05), 1.3))
+        if abs(rel) - half_w > 120.0:
+            continue
+        # Vertical extent: far and near edge of the base, and the top of the tower
+        el_far  = math.degrees(math.atan2(h, d + size / 2))
+        el_near = math.degrees(math.atan2(h, max(d - size / 2, 0.02)))
+        el_top  = math.degrees(math.atan2(h + thick, d + size * 0.15))
+        lo, hi  = min(el_far, el_top), min(max(el_near, el_top), 89.0)
+        cx      = W * 0.06 + (rel + 120.0) * px_deg
+        cw      = 2 * half_w * px_deg
+        if cw < 0.012 * W:
+            continue   # a speck: part of the distant bank's look
+        # The cumulus shape spans ~0.55·ch below its base line to ~1.2·ch above it
+        extent  = max((hi - lo) * py_deg, 3.0)
+        ch      = extent / 1.75
+        base_y  = H * 0.72 - lo * py_deg - 0.55 * ch
+        haze    = 1.0 - 0.55 * _clamp((d - 4.0) / 8.0, 0.0, 1.0)   # distant ones fade into haze
+        rng     = random.Random(f'lowc:{i}:shape')
+        side    = _clamp(1.0 - (0.5 * (lo + hi) - 12.0) / 30.0, 0.0, 1.0)   # 12° → 42°
+        _cumulus_cloud(cr, W, H, cx, base_y, cw, ch, a_base * haze, top_col, dark_col, rng,
+                       anvil=is_cb and size > 2.5, side=side)
