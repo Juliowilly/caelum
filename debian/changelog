@@ -1,3 +1,14 @@
+caelum (1.5.4-1) unstable; urgency=medium
+
+  * New upstream release 1.5.4.
+    - Your own photo as landscape (Settings -> Sky): built locally with
+      GdkPixbuf and cairo from the one file picked through the file
+      chooser; JPEG/PNG only, size-capped, saved without metadata, with a
+      preview before use.
+    - Default location is a public city-centre point at ~1 km precision.
+
+ -- Juliowilly <jw.adamagaba@gmail.com>  Sun, 25 Oct 2026 16:14:38 +0000
+
 caelum (1.5.3-1) unstable; urgency=medium
 
   * New upstream release 1.5.3.

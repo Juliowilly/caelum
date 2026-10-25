@@ -40,27 +40,38 @@
   </supports>
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.5.3/data/screenshots/sunset.png</image>
+      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.5.4/data/screenshots/sunset.png</image>
       <caption>Sunset over a tree-lined plain with sunlit clouds, the moon and planets, and the weekly forecast</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.5.3/data/screenshots/night.png</image>
+      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.5.4/data/screenshots/night.png</image>
       <caption>A clear night with constellations, planets and the Milky Way</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.5.3/data/screenshots/rain.png</image>
+      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.5.4/data/screenshots/rain.png</image>
       <caption>Rain over the mountains: the distance fades into the downpour</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.5.3/data/screenshots/day.png</image>
+      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.5.4/data/screenshots/day.png</image>
       <caption>A partly cloudy morning sky over the desktop</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.5.3/data/screenshots/settings.png</image>
+      <image>https://raw.githubusercontent.com/Juliowilly/caelum/v1.5.4/data/screenshots/settings.png</image>
       <caption>Settings: the Sky tab, with the opaque sky and the choice of landscape</caption>
     </screenshot>
   </screenshots>
   <releases>
+    <release version="1.5.4" date="2026-10-25">
+      <description>
+        <p>Your own photo as landscape.</p>
+        <ul>
+          <li>Settings → Sky → Your own photo: pick a wide outdoor shot or a phone panorama, and Caelum turns it into a landscape, relit by the sun and moon</li>
+          <li>A preview shows the result before you use it, and Remove deletes it</li>
+          <li>Everything is done on your computer: only the file you pick is read, and the landscape is saved without the photo's location, camera and date</li>
+          <li>The default location is now a city-centre point at about 1 km precision</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.5.3" date="2026-10-25">
       <description>
         <p>Your own landscape.</p>

@@ -1472,3 +1472,10 @@ The user called this "very important". The code's default location had 4 decimal
   releases), and copies already downloaded would remain. Not done; the user decides.
 - Existing installs keep whatever location their config saved; the default only applies to new
   configs.
+
+### Release 1.5.4 (2026-10-25)
+
+The user asked to release 1.5.4: "Your own photo" landscapes and the location privacy fix. Version
+bump in `__init__`, debian/changelog, metainfo (screenshots pinned to v1.5.4, not re-rendered: the
+default views are unchanged). The privacy grep (now in the release routine) found only public
+places, star positions and formula constants.
